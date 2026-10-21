@@ -14,10 +14,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  SWIFT_VERSION: "6.0"
-  XCODE_VERSION: "26.0"
-
 jobs:
   # Verificaciones rápidas que no necesitan compilar.
   hygiene:
@@ -57,9 +53,11 @@ jobs:
             exit 1
           fi
 
-      - name: Sin credenciales AWS escritas en el código
+      - name: Sin credenciales AWS en el código
         run: |
           set -euo pipefail
+          # `TestCredential` concentra la clave de ejemplo de la documentación de
+          # AWS y la construye por concatenación, así que no aparece literal.
           if grep -RInE 'AKIA[0-9A-Z]{16}' --include='*.swift' SriRobotMonitor Tests; then
             echo "::error::Posible Access Key ID de AWS en el código."
             exit 1
@@ -67,23 +65,18 @@ jobs:
 
   build-and-test:
     name: Compilar y probar (macOS)
-    runs-on: macos-15
+    runs-on: macos-26
     needs: hygiene
     steps:
       - uses: actions/checkout@v4
 
-      - name: Seleccionar Xcode
+      - name: Entorno
         run: |
           set -euo pipefail
-          echo "Xcode disponible: $(xcodebuild -version | head -1)"
-          if [ -d "/Applications/Xcode_${XCODE_VERSION}.app" ]; then
-            sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
-          fi
+          uname -m
+          sw_vers
           xcodebuild -version
           swift --version
-
-      - name: Resolver dependencias
-        run: xcodebuild -project SriRobotMonitor.xcodeproj -scheme SriRobotMonitor -resolvePackageDependencies
 
       - name: Compilar
         run: |
@@ -95,8 +88,9 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             build 2>&1 | tee build.log | grep -E 'error:|warning:|BUILD (SUCCEEDED|FAILED)' || true
-          if grep -qE '\*\* BUILD FAILED \*\*' build.log || ! grep -qE '\*\* BUILD SUCCEEDED \*\*' build.log; then
+          if ! grep -qE '\*\* BUILD SUCCEEDED \*\*' build.log; then
             grep -E 'error:' build.log | head -50 | while read -r line; do echo "::error::$line"; done
+            tail -40 build.log
             exit 1
           fi
 
@@ -110,10 +104,18 @@ jobs:
             -derivedDataPath build \
             -resultBundlePath TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO \
-            test 2>&1 | tee test.log | grep -E 'Test Suite|Test Case|error:|\*\* TEST (SUCCEEDED|FAILED)' || true
+            test 2>&1 | tee test.log | grep -E 'Test Suite|error:|\*\* TEST' || true
           if ! grep -qE '\*\* TEST SUCCEEDED \*\*' test.log; then
             grep -E 'error:|failed' test.log | head -40 | while read -r line; do echo "::error::$line"; done
+            tail -60 test.log
             exit 1
+          fi
+
+      - name: Resumen de pruebas
+        if: always()
+        run: |
+          if [ -f test.log ]; then
+            grep -E 'Executed [0-9]+ test' test.log | tail -1 >> "$GITHUB_STEP_SUMMARY" || true
           fi
 
       - name: Subir resultados de pruebas

@@ -1,5 +1,6 @@
-import XCTest
+import AppKit
 import SwiftUI
+import XCTest
 @testable import SriRobotMonitor
 
 /// Renderiza las vistas reales a PNG para revisarlas visualmente sin depender

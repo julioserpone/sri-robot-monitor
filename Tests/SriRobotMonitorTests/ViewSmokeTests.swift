@@ -1,6 +1,10 @@
-import XCTest
+import AppKit
 import SwiftUI
+import XCTest
 @testable import SriRobotMonitor
+
+// Los tests requieren el macOS del scheme (26). Donde no esté, el target ni
+// compila, así que el CI elige el runner y esta guarda evita ruido futuro.
 
 /// Prueba de humo de la interfaz: renderiza las vistas principales en modo
 /// headless para detectar fallos de construcción, y comprueba que la ventana
