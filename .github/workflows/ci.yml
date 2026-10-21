@@ -20,7 +20,7 @@ jobs:
     name: Documentación y convenciones
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Archivos obligatorios
         run: |
@@ -68,7 +68,7 @@ jobs:
     runs-on: macos-26
     needs: hygiene
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Entorno
         run: |
@@ -120,7 +120,7 @@ jobs:
 
       - name: Subir resultados de pruebas
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: TestResults.xcresult
@@ -129,7 +129,7 @@ jobs:
 
       - name: Subir app compilada
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: SriRobotMonitor-debug
           path: build/Build/Products/Debug/SriRobotMonitor.app
