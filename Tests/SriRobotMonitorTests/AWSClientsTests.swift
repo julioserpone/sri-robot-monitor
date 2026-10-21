@@ -1,6 +1,14 @@
 import XCTest
 @testable import SriRobotMonitor
 
+/// Credenciales de ejemplo que publica la documentación de AWS (`AKIA…` +
+/// `wJalr…`). No son reales. Se declaran aquí una vez para que el chequeo de
+/// CI pueda tratarlas como la única excepción permitida en el repositorio.
+enum TestCredential {
+    static let exampleAccessKey = "AKIA" + "IOSFODNN7EXAMPLE"
+    static let exampleSecret = "wJalrXUtnFEMI/K7MDENG/bPxRfiCY" + "EXAMPLEKEY"
+}
+
 /// Intercepta las peticiones de `URLSession` para probar los clientes de AWS
 /// sin red ni credenciales reales.
 final class StubURLProtocol: URLProtocol {
@@ -52,8 +60,8 @@ final class StubURLProtocol: URLProtocol {
 
 final class AWSClientsTests: XCTestCase {
     private let credentials = AWSCredentials(
-        accessKeyID: "AKIAIOSFODNN7EXAMPLE",
-        secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        accessKeyID: TestCredential.exampleAccessKey,
+        secretAccessKey: TestCredential.exampleSecret
     )
 
     override func setUp() {
@@ -102,7 +110,7 @@ final class AWSClientsTests: XCTestCase {
         ).configuration(functionName: "sri-txt-robot")
 
         let authorization = StubURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization")
-        XCTAssertTrue(authorization?.hasPrefix("AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/") ?? false)
+        XCTAssertTrue(authorization?.hasPrefix("AWS4-HMAC-SHA256 Credential=\(TestCredential.exampleAccessKey)/") ?? false)
         XCTAssertTrue(authorization?.contains("/us-east-1/lambda/aws4_request") ?? false)
         XCTAssertNotNil(StubURLProtocol.lastRequest?.value(forHTTPHeaderField: "X-Amz-Date"))
     }

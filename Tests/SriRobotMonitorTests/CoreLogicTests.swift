@@ -301,8 +301,8 @@ final class AWSSignerTests: XCTestCase {
     func testKnownSigV4VectorFromAWSDocs() {
         // Vector oficial "GET Object" de la documentación de Signature Version 4.
         let credentials = AWSCredentials(
-            accessKeyID: "AKIAIOSFODNN7EXAMPLE",
-            secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+            accessKeyID: TestCredential.exampleAccessKey,
+            secretAccessKey: TestCredential.exampleSecret
         )
         var request = URLRequest(url: URL(string: "https://examplebucket.s3.amazonaws.com/test.txt")!)
         request.httpMethod = "GET"
@@ -317,7 +317,7 @@ final class AWSSignerTests: XCTestCase {
         )
 
         XCTAssertNotNil(request.value(forHTTPHeaderField: "Authorization"))
-        XCTAssertTrue(request.value(forHTTPHeaderField: "Authorization")?.hasPrefix("AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request") ?? false)
+        XCTAssertTrue(request.value(forHTTPHeaderField: "Authorization")?.hasPrefix("AWS4-HMAC-SHA256 Credential=\(TestCredential.exampleAccessKey)/20130524/us-east-1/s3/aws4_request") ?? false)
     }
 
     func testSignatureKeyIsDeterministic() {
