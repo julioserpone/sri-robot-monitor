@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Reportar una vulnerabilidad
+    url: https://github.com/julioserpone/sri-robot-monitor/security/advisories/new
+    about: No abras un issue público para problemas de seguridad. Usa el reporte privado.
+  - name: Documentación del proyecto
+    url: https://github.com/julioserpone/sri-robot-monitor#readme
+    about: Instalación, permisos de AWS y guía de uso.
+  - name: El robot supervisado
+    url: https://github.com/julioserpone/sri-txt-robot
+    about: Problemas del robot en sí (Lambda, scraping, SRI) van en su propio repositorio.

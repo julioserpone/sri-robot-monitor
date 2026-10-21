@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  SWIFT_VERSION: "6.0"
+  XCODE_VERSION: "26.0"
+
+jobs:
+  # Verificaciones rápidas que no necesitan compilar.
+  hygiene:
+    name: Documentación y convenciones
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Archivos obligatorios
+        run: |
+          set -euo pipefail
+          missing=0
+          for file in README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md \
+                      LICENSE docs/ARQUITECTURA.md docs/PRUEBAS.md docs/USO_IA.md \
+                      .github/pull_request_template.md .github/dependabot.yml \
+                      .github/workflows/ci.yml .github/rulesets/main.json; do
+            if [ ! -f "$file" ]; then
+              echo "::error file=$file::Falta $file"
+              missing=1
+            fi
+          done
+          exit $missing
+
+      - name: Plantillas de issues y PR
+        run: |
+          set -euo pipefail
+          test -f .github/ISSUE_TEMPLATE/bug_report.yml
+          test -f .github/ISSUE_TEMPLATE/feature_request.yml
+          test -f .github/ISSUE_TEMPLATE/config.yml
+          test -f .github/pull_request_template.md
+
+      - name: Sin secretos obvios versionados
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(\.env$|.*\.p12$|.*\.pem$|id_rsa$)'; then
+            echo "::error::Hay archivos sensibles versionados."
+            exit 1
+          fi
+
+      - name: Sin credenciales AWS escritas en el código
+        run: |
+          set -euo pipefail
+          if grep -RInE 'AKIA[0-9A-Z]{16}' --include='*.swift' SriRobotMonitor Tests; then
+            echo "::error::Posible Access Key ID de AWS en el código."
+            exit 1
+          fi
+
+  build-and-test:
+    name: Compilar y probar (macOS)
+    runs-on: macos-15
+    needs: hygiene
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Seleccionar Xcode
+        run: |
+          set -euo pipefail
+          echo "Xcode disponible: $(xcodebuild -version | head -1)"
+          if [ -d "/Applications/Xcode_${XCODE_VERSION}.app" ]; then
+            sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          fi
+          xcodebuild -version
+          swift --version
+
+      - name: Resolver dependencias
+        run: xcodebuild -project SriRobotMonitor.xcodeproj -scheme SriRobotMonitor -resolvePackageDependencies
+
+      - name: Compilar
+        run: |
+          set -o pipefail
+          xcodebuild -project SriRobotMonitor.xcodeproj \
+            -scheme SriRobotMonitor \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | tee build.log | grep -E 'error:|warning:|BUILD (SUCCEEDED|FAILED)' || true
+          if grep -qE '\*\* BUILD FAILED \*\*' build.log || ! grep -qE '\*\* BUILD SUCCEEDED \*\*' build.log; then
+            grep -E 'error:' build.log | head -50 | while read -r line; do echo "::error::$line"; done
+            exit 1
+          fi
+
+      - name: Pruebas unitarias
+        run: |
+          set -o pipefail
+          xcodebuild -project SriRobotMonitor.xcodeproj \
+            -scheme SriRobotMonitor \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            test 2>&1 | tee test.log | grep -E 'Test Suite|Test Case|error:|\*\* TEST (SUCCEEDED|FAILED)' || true
+          if ! grep -qE '\*\* TEST SUCCEEDED \*\*' test.log; then
+            grep -E 'error:|failed' test.log | head -40 | while read -r line; do echo "::error::$line"; done
+            exit 1
+          fi
+
+      - name: Subir resultados de pruebas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults.xcresult
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Subir app compilada
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SriRobotMonitor-debug
+          path: build/Build/Products/Debug/SriRobotMonitor.app
+          if-no-files-found: error
+          retention-days: 7

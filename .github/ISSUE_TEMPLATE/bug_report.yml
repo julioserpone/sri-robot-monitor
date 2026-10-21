@@ -1,0 +1,103 @@
+name: Reporte de error
+description: Algo en la app no funciona como debería
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por tomarte el tiempo de reportar. **No incluyas credenciales,
+        tokens ni datos de contribuyentes**: si pegaste algo así, rótalo antes de
+        enviar el formulario.
+
+  - type: input
+    id: version
+    attributes:
+      label: Versión de la app
+      description: Aparece en la barra lateral o en Ajustes.
+      placeholder: "1.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: macos
+    attributes:
+      label: Versión de macOS
+      placeholder: "macOS 26.0 (25A354)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - LED / estado
+        - Logs en vivo (Live Tail)
+        - Sondeo de logs
+        - Relanzar el robot
+        - Credenciales / onboarding
+        - Notificaciones
+        - Interfaz / diseño
+        - Otra
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Qué pasó
+      description: Qué esperabas y qué ocurrió en su lugar.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para reproducirlo
+      placeholder: |
+        1. Abrir la app
+        2. Ir a Registros
+        3. Relanzar con "Esperar el resultado"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Modo de lectura en ese momento
+      options:
+        - Live Tail
+        - Sondeo (respaldo)
+        - No lo sé
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Registros o mensajes de error
+      description: |
+        Copia solo los fragmentos relevantes. Quita Access Key ID, tokens,
+        nombres de cuentas y cualquier dato del contribuyente.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Capturas
+      description: Si el problema es visual, arrastra la imagen aquí.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmaciones
+      options:
+        - label: He quitado toda credencial y dato sensible del reporte.
+          required: true
+        - label: Busqué un issue parecido antes de abrir este.
+          required: true

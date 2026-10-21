@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión a publicar (por ejemplo 1.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Construir y publicar DMG
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolver versión
+        id: version
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publicando $VERSION"
+
+      - name: Aplicar versión al proyecto
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" \
+            SriRobotMonitor/Resources/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${GITHUB_RUN_NUMBER}" \
+            SriRobotMonitor/Resources/Info.plist
+
+      - name: Pruebas
+        run: |
+          set -o pipefail
+          xcodebuild -project SriRobotMonitor.xcodeproj \
+            -scheme SriRobotMonitor \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            test 2>&1 | tee test.log | grep -E 'Test Suite|error:|\*\* TEST' || true
+          if ! grep -qE '\*\* TEST SUCCEEDED \*\*' test.log; then
+            grep -E 'error:|failed' test.log | head -40
+            exit 1
+          fi
+
+      - name: Archivar app
+        run: |
+          set -o pipefail
+          xcodebuild -project SriRobotMonitor.xcodeproj \
+            -scheme SriRobotMonitor \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -archivePath build/SriRobotMonitor.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            archive
+
+      - name: Empaquetar DMG
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp -R build/SriRobotMonitor.xcarchive/Products/Applications/SriRobotMonitor.app dist/
+          ln -s /Applications dist/Aplicaciones
+          hdiutil create -volname "SRI Robot Monitor" \
+            -srcfolder dist \
+            -ov -format UDZO \
+            "dist/SriRobotMonitor.dmg"
+
+      - name: Publicar en GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/SriRobotMonitor.dmg
+          generate_release_notes: true
+          name: SRI Robot Monitor ${{ steps.version.outputs.version }}
+          body: |
+            ## SRI Robot Monitor ${{ steps.version.outputs.version }}
+
+            App de macOS para supervisar `sri-txt-robot` en AWS Lambda en tiempo real.
+
+            ### Instalación
+            1. Descarga `SriRobotMonitor.dmg`.
+            2. Abre el DMG y arrastra la app a **Aplicaciones**.
+            3. La app no está notarizada; la primera vez usa *Abrir* con clic derecho.
+
+            Ver [CHANGELOG.md](https://github.com/julioserpone/sri-robot-monitor/blob/main/CHANGELOG.md).

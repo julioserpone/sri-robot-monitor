@@ -1,0 +1,61 @@
+name: Propuesta de mejora
+description: Una idea para la app o para el flujo de trabajo
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Las propuestas grandes conviene discutirlas antes de escribir código.
+        Explica el problema antes que la solución.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qué problema resuelve
+      description: Describe la situación actual y qué te obliga a hacer hoy.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Propuesta
+      description: Cómo imaginas la solución en la app.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - LED / estado
+        - Logs en vivo
+        - Relanzar el robot
+        - Credenciales
+        - Notificaciones
+        - Interfaz / diseño
+        - Distribución / CI
+        - Otra
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas consideradas
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Alcance
+      options:
+        - label: Estoy dispuesto/a a enviar un PR para esto.
+          required: false
+        - label: Esto requiere permisos nuevos en AWS.
+          required: false
+        - label: Esto cambia lo que ve quien ya usa la app (necesita CHANGELOG).
+          required: false

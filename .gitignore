@@ -1,0 +1,28 @@
+# build
+build/
+DerivedData/
+*.xcresult
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+.swiftpm/
+.build/
+Package.resolved
+
+# Sistema
+.DS_Store
+._*
+
+# Secretos (nunca deben existir, pero por si acaso)
+.env
+.env.*
+!.env.example
+*.p12
+*.pem
+*.cer
+*.mobileprovision
+
+# IDE
+.vscode/
+.idea/
+*.swp
