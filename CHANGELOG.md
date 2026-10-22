@@ -41,6 +41,11 @@ y el versionado [SemVer](https://semver.org/lang/es/).
   necesario. Revelar el secreto ya no destruye el campo ni pierde el foco.
 - **El LED de la barra de menús no se pintaba:** macOS lo trataba como imagen
   plantilla y descartaba el color.
+- **Icono de la barra con identidad propia:** antena con ondas, LED de estado y
+  mástil. La silueta se entrega como plantilla (se adapta a la barra clara u
+  oscura) y el LED a color encima; mientras el robot ejecuta, las ondas laten.
+  Antes se usaba `wave.2.*`, un símbolo que no existe en SF Symbols, así que el
+  icono quedaba reducido a un punto.
 - **Rutas con espacios o tildes** se firmaban distintas a las enviadas, lo que
   habría fallado al descargar archivos con nombres reales.
 - `ejecuciones.json` de versiones anteriores se descartaba al añadir
