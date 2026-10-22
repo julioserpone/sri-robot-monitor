@@ -41,7 +41,7 @@ Closes #
 - [ ] Usé IA y revisé cada línea
 - [ ] Usé IA para parte del trabajo (detalla abajo)
 
-<!-- Qué herramienta, para qué partes y qué no pudiste verificar. Ver docs/USO_IA.md -->
+<!-- Qué herramienta, para qué partes y qué no pudiste verificar. Ver docs/AI_USAGE.md -->
 
 ## Capturas
 

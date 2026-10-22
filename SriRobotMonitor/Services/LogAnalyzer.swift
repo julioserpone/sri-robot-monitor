@@ -132,6 +132,7 @@ private struct MutableRun {
     var environment: String?
     var ruc: String?
     var failureMessages: [String] = []
+    var warningMessages: [String] = []
 
     init(requestID: String, startedAt: Date, isDerived: Bool = false) {
         self.requestID = requestID
@@ -142,6 +143,7 @@ private struct MutableRun {
     mutating func absorb(_ entry: LogEntry) {
         if entry.level == .warning {
             warningCount += 1
+            appendWarning(entry.message)
         }
         if entry.level == .error {
             errorCount += 1
@@ -241,9 +243,19 @@ private struct MutableRun {
             finished: finished,
             timedOut: timedOut,
             failureMessages: Array(messages.prefix(8)),
+            warningMessages: Array(warningMessages.prefix(8)),
             logStreamName: logStreamName,
             isDerived: isDerived
         )
+    }
+
+    /// Guarda el texto de cada advertencia para poder explicar el LED naranja.
+    private mutating func appendWarning(_ message: String) {
+        guard warningMessages.count < 8 else { return }
+        let clean = message.split(separator: "\n").first.map(String.init) ?? message
+        let trimmed = clean.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !warningMessages.contains(trimmed) else { return }
+        warningMessages.append(String(trimmed.prefix(500)))
     }
 
     private mutating func appendFailure(_ message: String) {

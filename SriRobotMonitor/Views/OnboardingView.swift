@@ -93,9 +93,24 @@ struct OnboardingView: View {
                 }
 
                 HStack(spacing: 10) {
-                    feature(symbol: "circle.fill", tint: Palette.green, title: "LED de estado", detail: "Verde, naranja o rojo con el último resultado.")
-                    feature(symbol: "text.alignleft", tint: Palette.blue, title: "Logs en vivo", detail: "CloudWatch filtrado y legible al instante.")
-                    feature(symbol: "play.circle.fill", tint: Palette.violet, title: "Relanzar", detail: "Dispara el perfil caliente sin salir de la app.")
+                    feature(
+                        symbol: "circle.fill",
+                        tint: Palette.green,
+                        title: "LED de estado",
+                        detail: "Mira el color y sabrás en qué etapa está el robot: si está buscando facturas, si terminó bien o si algo falló."
+                    )
+                    feature(
+                        symbol: "text.alignleft",
+                        tint: Palette.blue,
+                        title: "Logs en vivo",
+                        detail: "Las líneas de CloudWatch llegan mientras el robot trabaja, sin esperar a que termine."
+                    )
+                    feature(
+                        symbol: "play.circle.fill",
+                        tint: Palette.violet,
+                        title: "Relanzar",
+                        detail: "Vuelve a ejecutar el perfil caliente desde la app, sin abrir la consola de AWS."
+                    )
                 }
 
                 Divider().overlay(.white.opacity(0.07))
@@ -111,16 +126,9 @@ struct OnboardingView: View {
 
                     Spacer()
 
-                    Button {
+                    SetupButton(title: "Configurar AWS", symbol: "arrow.right", action: {
                         withAnimation(.snappy(duration: 0.25)) { step = 1 }
-                    } label: {
-                        Label("Configurar AWS", systemImage: "arrow.right")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .frame(minWidth: 130)
-                    }
-                    .buttonStyle(.glassProminent)
-                    .tint(Palette.green)
-                    .controlSize(.large)
+                    })
                     .keyboardShortcut(.defaultAction)
                 }
             }
@@ -168,78 +176,54 @@ struct OnboardingView: View {
                 Divider().overlay(.white.opacity(0.06))
 
                 HStack(spacing: 10) {
-                    Button {
+                    SetupButton(title: "Atrás", symbol: "chevron.left", role: .secondary, minWidth: 96) {
                         withAnimation(.snappy(duration: 0.25)) { step = max(0, step - 1) }
                         errorMessage = nil
-                    } label: {
-                        Label("Atrás", systemImage: "chevron.left")
-                            .font(.system(size: 10, weight: .medium))
                     }
-                    .buttonStyle(.glass)
-                    .controlSize(.regular)
                     .disabled(saving)
 
                     Spacer()
 
                     if step == 1 {
-                        Button {
-                            testCredentials()
-                        } label: {
-                            HStack(spacing: 6) {
-                                if testing { ProgressView().controlSize(.small) }
-                                Text(testing ? "Validando…" : "Probar credenciales")
-                            }
-                        }
-                        .buttonStyle(.glass)
-                        .controlSize(.regular)
+                        SetupButton(
+                            title: testing ? "Validando…" : "Probar credenciales",
+                            symbol: "checkmark.shield",
+                            role: .secondary,
+                            loading: testing,
+                            minWidth: 160,
+                            action: testCredentials
+                        )
                         .disabled(testing || !draft.hasCredentials)
 
-                        Button {
+                        SetupButton(title: "Continuar", symbol: "arrow.right") {
                             withAnimation(.snappy(duration: 0.25)) { step = 2 }
                             errorMessage = nil
-                        } label: {
-                            Label("Continuar", systemImage: "arrow.right")
                         }
-                        .buttonStyle(.glassProminent)
-                        .tint(Palette.green)
-                        .controlSize(.large)
                         .disabled(identity == nil)
                     } else if step == 2 {
-                        Button {
-                            testFunction()
-                        } label: {
-                            HStack(spacing: 6) {
-                                if testing { ProgressView().controlSize(.small) }
-                                Text(testing ? "Comprobando…" : "Comprobar función")
-                            }
-                        }
-                        .buttonStyle(.glass)
-                        .controlSize(.regular)
+                        SetupButton(
+                            title: testing ? "Comprobando…" : "Comprobar función",
+                            symbol: "server.rack",
+                            role: .secondary,
+                            loading: testing,
+                            minWidth: 160,
+                            action: testFunction
+                        )
                         .disabled(testing || !draft.hasCredentials || draft.functionName.isEmpty)
 
-                        Button {
+                        SetupButton(title: "Continuar", symbol: "arrow.right") {
                             withAnimation(.snappy(duration: 0.25)) { step = 3 }
                             errorMessage = nil
-                        } label: {
-                            Label("Continuar", systemImage: "arrow.right")
                         }
-                        .buttonStyle(.glassProminent)
-                        .tint(Palette.green)
-                        .controlSize(.large)
                         .disabled(function == nil)
                     } else {
-                        Button {
-                            save()
-                        } label: {
-                            HStack(spacing: 6) {
-                                if saving { ProgressView().controlSize(.small) }
-                                Text(saving ? "Guardando…" : "Empezar a supervisar")
-                            }
-                            .frame(minWidth: 150)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .tint(Palette.green)
-                        .controlSize(.large)
+                        SetupButton(
+                            title: saving ? "Guardando…" : "Empezar a supervisar",
+                            symbol: "play.fill",
+                            loading: saving,
+                            minWidth: 190,
+                            action: save
+                        )
                         .disabled(saving)
                     }
                 }
@@ -251,40 +235,27 @@ struct OnboardingView: View {
         VStack(spacing: 11) {
             HStack(alignment: .top, spacing: 11) {
                 LabeledField(title: "Región", symbol: "globe.americas.fill") {
-                    TextField("us-east-1", text: $draft.region)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 11, design: .monospaced))
+                    SetupTextField("us-east-1", text: $draft.region)
                 }
+                .onChange(of: draft.region) { _, _ in invalidateConnection() }
+
                 LabeledField(title: "Access Key ID", symbol: "person.badge.key") {
-                    TextField("AKIA…", text: $draft.accessKeyID)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 11, design: .monospaced))
+                    SetupTextField("AKIA…", text: $draft.accessKeyID)
                 }
+                .onChange(of: draft.accessKeyID) { _, _ in invalidateConnection() }
             }
 
+            // Un solo campo por secreto, oculto o visible: intercambiar
+            // `TextField` y `SecureField` destruye la vista y el foco salta.
             LabeledField(title: "Secret Access Key", symbol: "lock.fill") {
-                Group {
-                    if showSecrets {
-                        TextField("Secret Access Key", text: $draft.secretAccessKey)
-                    } else {
-                        SecureField("Secret Access Key", text: $draft.secretAccessKey)
-                    }
-                }
-                .textFieldStyle(.plain)
-                .font(.system(size: 11, design: .monospaced))
+                SecretTextField("Secret Access Key", text: $draft.secretAccessKey, revealed: showSecrets)
             }
+            .onChange(of: draft.secretAccessKey) { _, _ in invalidateConnection() }
 
             LabeledField(title: "Session token (opcional)", symbol: "clock.badge.checkmark") {
-                Group {
-                    if showSecrets {
-                        TextField("Solo credenciales temporales", text: $draft.sessionToken)
-                    } else {
-                        SecureField("Solo credenciales temporales", text: $draft.sessionToken)
-                    }
-                }
-                .textFieldStyle(.plain)
-                .font(.system(size: 11, design: .monospaced))
+                SecretTextField("Solo credenciales temporales", text: $draft.sessionToken, revealed: showSecrets)
             }
+            .onChange(of: draft.sessionToken) { _, _ in invalidateConnection() }
 
             HStack {
                 Toggle(isOn: $showSecrets) {
@@ -293,6 +264,7 @@ struct OnboardingView: View {
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
+                .animation(nil, value: showSecrets)
 
                 Spacer()
 
@@ -307,15 +279,17 @@ struct OnboardingView: View {
                 }
             }
 
-            Text("Permiso mínimo recomendado: sts:GetCallerIdentity, lambda:GetFunctionConfiguration, lambda:InvokeFunction y logs:FilterLogEvents.")
+            Text("Permiso mínimo recomendado: sts:GetCallerIdentity, lambda:GetFunctionConfiguration, lambda:InvokeFunction, logs:FilterLogEvents, logs:StartLiveTail y s3:GetObject.")
                 .font(.system(size: 8.5))
                 .foregroundStyle(Palette.textSecondary)
         }
-        .onChange(of: draft) { _, _ in
-            identity = nil
-            function = nil
-            errorMessage = nil
-        }
+    }
+
+    /// Cambiar cualquier dato invalida la prueba anterior, pero solo eso:
+    /// no reescribe el borrador ni reinicia los otros pasos.
+    private func invalidateConnection() {
+        identity = nil
+        errorMessage = nil
     }
 
     private var functionStep: some View {
@@ -333,21 +307,20 @@ struct OnboardingView: View {
 
             HStack(alignment: .top, spacing: 11) {
                 LabeledField(title: "Función de Lambda", symbol: "server.rack") {
-                    TextField("sri-txt-robot", text: $draft.functionName)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 11, design: .monospaced))
+                    SetupTextField("sri-txt-robot", text: $draft.functionName)
                 }
                 .onChange(of: draft.functionName) { oldValue, newValue in
-                    if draft.logGroupName == RobotConfiguration.defaultLogGroup(for: oldValue) {
+                    if draft.logGroupName == RobotConfiguration.defaultLogGroup(for: oldValue)
+                        || draft.logGroupName.isEmpty {
                         draft.logGroupName = RobotConfiguration.defaultLogGroup(for: newValue)
                     }
+                    invalidateFunction()
                 }
 
                 LabeledField(title: "Log group", symbol: "text.alignleft") {
-                    TextField("/aws/lambda/sri-txt-robot", text: $draft.logGroupName)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 11, design: .monospaced))
+                    SetupTextField("/aws/lambda/sri-txt-robot", text: $draft.logGroupName)
                 }
+                .onChange(of: draft.logGroupName) { _, _ in invalidateFunction() }
             }
 
             if let function {
@@ -370,10 +343,11 @@ struct OnboardingView: View {
                 .font(.system(size: 8.5))
                 .foregroundStyle(Palette.textSecondary)
         }
-        .onChange(of: draft) { _, _ in
-            function = nil
-            errorMessage = nil
-        }
+    }
+
+    private func invalidateFunction() {
+        function = nil
+        errorMessage = nil
     }
 
     private var summaryStep: some View {

@@ -6,6 +6,7 @@ import UserNotifications
 enum AppSection: String, CaseIterable, Identifiable, Sendable {
     case dashboard
     case runs
+    case files
     case logs
     case settings
 
@@ -15,6 +16,7 @@ enum AppSection: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .dashboard: "Panel"
         case .runs: "Ejecuciones"
+        case .files: "Archivos"
         case .logs: "Registros"
         case .settings: "Configuración"
         }
@@ -24,6 +26,7 @@ enum AppSection: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .dashboard: "Estado del robot en tiempo real"
         case .runs: "Historial reconstruido desde CloudWatch"
+        case .files: "Contenido del bucket configurado"
         case .logs: "Flujo de CloudWatch Logs"
         case .settings: "Credenciales, conexión y datos"
         }
@@ -33,6 +36,7 @@ enum AppSection: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .dashboard: "gauge.with.dots.needle.67percent"
         case .runs: "clock.arrow.circlepath"
+        case .files: "folder.fill"
         case .logs: "text.alignleft"
         case .settings: "gearshape.fill"
         }
@@ -47,6 +51,14 @@ final class MonitorEngine {
     var credentials: AWSCredentials?
     /// Secretos del robot que viajan en el evento de invocación.
     var environment = RobotEnvironment()
+    /// Artefactos (TXT y JSON) encontrados en S3 para cada ejecución.
+    var artifacts: [String: [S3Object]] = [:]
+    var artifactErrors: [String: String] = [:]
+    /// Árbol del bucket para el explorador de archivos.
+    var bucketTree: [BucketNode] = []
+    var bucketLoading = false
+    var bucketError: String?
+    var bucketLoadedAt: Date?
     var callerIdentity: CallerIdentity?
     var functionInfo: LambdaFunctionInfo?
     var runs: [RobotRun] = []
@@ -76,6 +88,9 @@ final class MonitorEngine {
     var lastInvocationFinishedAt: Date?
     /// Variables de entorno que la función de Lambda tiene declaradas.
     var functionEnvironmentKeys: Set<String> = []
+    /// RequestId que la vista de registros debe resaltar al abrirse. Se limpia
+    /// en cuanto la vista lo consume.
+    var pendingLogHighlight: String?
 
     private let persistence: AppPersistence
     /// Sesión HTTP de los clientes de AWS. Inyectable para poder probar los
@@ -630,6 +645,8 @@ final class MonitorEngine {
         config.region = draft.configuration.region
         config.functionName = draft.configuration.functionName
         config.logGroupName = draft.configuration.logGroupName
+        config.bucketName = draft.bucketName
+        config.environmentName = draft.environmentName
         config.environment = draft.environment
         config = RobotConfiguration.normalized(config)
 
@@ -829,6 +846,128 @@ final class MonitorEngine {
         logs.append(entry)
     }
 
+    // MARK: - Explorador de archivos
+
+    /// Carga el listado del bucket completo (hasta el tope de S3 por llamada)
+    /// y lo convierte en un árbol de carpetas.
+    func loadBucketTree(force: Bool = false) async {
+        guard let credentials, credentials.isComplete else { return }
+        guard !configuration.bucketName.isEmpty else {
+            bucketError = "Indica el bucket de S3 en Ajustes para explorar los archivos."
+            bucketTree = []
+            return
+        }
+        if bucketLoading { return }
+        if !force, let bucketLoadedAt, Date().timeIntervalSince(bucketLoadedAt) < 120 { return }
+
+        bucketLoading = true
+        bucketError = nil
+        defer { bucketLoading = false }
+
+        let client = S3Client(
+            credentials: credentials,
+            region: configuration.region,
+            session: session
+        )
+        do {
+            var objects: [S3Object] = []
+            var token: String?
+            var pages = 0
+            repeat {
+                let page = try await client.listObjects(
+                    bucket: configuration.bucketName,
+                    prefix: "",
+                    continuationToken: token
+                )
+                objects.append(contentsOf: page.objects)
+                token = page.nextToken
+                pages += 1
+            } while token != nil && pages < 10
+
+            bucketTree = BucketNode.build(from: objects)
+            bucketLoadedAt = Date()
+        } catch let error as AWSAPIError {
+            bucketError = error.friendlyMessage
+        } catch {
+            bucketError = error.localizedDescription
+        }
+    }
+
+    // MARK: - Descarga de artefactos
+
+    /// Busca en S3 el TXT y el JSON que el robot generó para una ejecución.
+    ///
+    /// Se hace a petición (al abrir el detalle o pulsar Descargar) y no en
+    /// cada sondeo: listar S3 cuesta una llamada por carpeta y período, y no
+    /// hace falta hasta que alguien quiere el archivo.
+    func loadArtifacts(for run: RobotRun) async {
+        guard let credentials, credentials.isComplete else { return }
+        guard !run.periods.isEmpty else {
+            artifactErrors[run.id] = "La ejecución no registró períodos en los logs."
+            return
+        }
+        guard !configuration.bucketName.isEmpty else {
+            artifactErrors[run.id] = "Indica el bucket de S3 en Ajustes para descargar los archivos."
+            return
+        }
+        if artifacts[run.id] != nil { return }
+
+        artifactErrors[run.id] = nil
+        let client = S3Client(
+            credentials: credentials,
+            region: configuration.region,
+            session: session
+        )
+        do {
+            let found = try await client.findArtifacts(
+                bucket: configuration.bucketName,
+                environment: run.environment ?? configuration.environmentName,
+                periods: run.periods,
+                ruc: run.ruc
+            )
+            artifacts[run.id] = found
+            if found.isEmpty {
+                artifactErrors[run.id] = "No hay archivos de esa ejecución en s3://\(configuration.bucketName)."
+            }
+        } catch let error as AWSAPIError {
+            artifactErrors[run.id] = error.friendlyMessage
+        } catch {
+            artifactErrors[run.id] = error.localizedDescription
+        }
+    }
+
+    /// Descarga un objeto y lo escribe donde la persona elija.
+    ///
+    /// Devuelve `false` si se canceló el diálogo de guardar.
+    func download(_ object: S3Object) async throws -> Bool {
+        guard let credentials, credentials.isComplete else {
+            throw SetupError.missingCredentials
+        }
+        let client = S3Client(
+            credentials: credentials,
+            region: configuration.region,
+            session: session
+        )
+        let data = try await client.getObject(object)
+
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = object.fileName
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        panel.title = "Guardar \(object.kind.title)"
+        // `runModal()` dentro de una `Task` bloquea el hilo principal y deja la
+        // app sin responder (el panel aparece pero los clics no hacen nada).
+        // La API asíncrona lo presenta sin bloquear.
+        guard await panel.begin() == .OK, let url = panel.url else { return false }
+
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            throw DownloadError.writeFailed(url: url, underlying: error.localizedDescription)
+        }
+        return true
+    }
+
     // MARK: - Datos locales
 
     func clearHistory() async {
@@ -887,6 +1026,18 @@ enum InvocationFailure: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .summaryFailed(message): "La ejecución terminó con fallos: \(message)"
+        }
+    }
+}
+
+/// Fallos al guardar un archivo descargado.
+enum DownloadError: LocalizedError {
+    case writeFailed(url: URL, underlying: String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .writeFailed(url, underlying):
+            "Se descargó el archivo, pero no se pudo escribir en \(url.path(percentEncoded: false)): \(underlying)"
         }
     }
 }

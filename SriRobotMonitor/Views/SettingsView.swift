@@ -140,6 +140,23 @@ struct SettingsView: View {
                     }
                 }
 
+                HStack(alignment: .top, spacing: 14) {
+                    LabeledField(title: "Bucket S3 (opcional)", symbol: "externaldrive") {
+                        TextField("facturas-recibidas", text: $draft.bucketName)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 11, design: .monospaced))
+                    }
+                    LabeledField(title: "Ambiente en S3", symbol: "folder") {
+                        TextField("produccion", text: $draft.environmentName)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 11, design: .monospaced))
+                    }
+                }
+
+                Text("El bucket permite descargar el TXT y el JSON de cada ejecución desde el detalle de la ejecución.")
+                    .font(.system(size: 8.5))
+                    .foregroundStyle(Palette.textSecondary)
+
                 Divider().overlay(.white.opacity(0.05))
 
                 HStack(spacing: 18) {

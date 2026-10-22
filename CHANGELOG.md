@@ -6,9 +6,92 @@ y el versionado [SemVer](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Añadido
+
+- `scripts/verify.sh`: verificación local completa (higiene, compilación y
+  pruebas) para ejecutar antes de subir, sin gastar minutos de Actions.
+- Explorador de archivos del bucket en el menú lateral, con búsqueda, tamaños,
+  fechas y descarga de cada objeto.
+
+### Cambiado
+
+- El CI de GitHub solo compila y prueba en macOS, y solo en los PR.
+- Regla de `main`: el único check obligatorio es `Compilar y probar (macOS)`.
+
+### Corregido
+
+- **El Llavero ya no pide la contraseña del Mac cada vez.** La entrada se crea
+  con acceso abierto para cualquier aplicación de este Mac y no se copia a
+  iCloud (`…ThisDeviceOnly`). Con el valor por defecto solo el binario que la
+  creó podía leerla, así que cada compilación (Debug, Release, Xcode) contaba
+  como otra app y volvía a preguntar aunque se pulsara "Always allow".
+- **El panel de guardar no aparecía en builds con sandbox.** Solo había
+  `files.user-selected.read-only`; `NSSavePanel` exige `read-write`. Confirmado
+  en el binario firmado con `codesign -d --entitlements`.
+- **La búsqueda de archivos usaba un layout de S3 que no existe.** Las claves
+  reales son `{ambiente}/{timestamp}/{año-mes}/facturas-recibidas-{año-mes}.txt`
+  (por ejemplo `produccion/1758871873001/2026-05/…`). Ahora se lista por
+  ambiente y se filtra por mes y RUC; los layouts antiguos siguen funcionando.
+- **Descargar un archivo dejaba la app bloqueada.** `NSSavePanel.runModal()` se
+  llamaba dentro de una `Task` y bloqueaba el hilo principal: el panel aparecía
+  pero no respondía. Ahora usa la API asíncrona (`begin()`), y los fallos al
+  escribir el archivo se explican con la ruta concreta.
+- S3 exige `x-amz-content-sha256` y la app no lo enviaba, así que el explorador
+  y la descarga de una ejecución fallaban con "Missing required header".
+
+### Retirado
+
+- **CodeQL**: compilaba el proyecto entero y consumía la cuota gratuita (más de
+  10 minutos por ejecución). La auditoría se hace en local con `verify.sh`.
+- El job de higiene en Ubuntu: lo cubre `verify.sh --quick` al instante.
+  Además pedía `docs/ARQUITECTURA.md`, `docs/PRUEBAS.md` y `docs/USO_IA.md`,
+  que ya no existen: habría fallado en cada PR.
+- El disparador en `push` a `main`: main solo recibe cambios por PR.
+
 ### Pendiente
 
 - Firma y notarización de las builds publicadas.
+
+## [1.2.0] — 2026-10-21
+
+### Añadido
+
+- **Descarga del TXT y el JSON de cada ejecución.** El detalle de una ejecución
+  localiza en S3 los archivos que dejó el robot (`raw/` y `manifest/`) y los
+  guarda donde elijas con el panel de macOS. Requiere `s3:GetObject` y
+  `s3:ListBucket`, y el bucket configurado en Ajustes.
+- **Advertencias explicadas.** El detalle de la ejecución muestra el texto de
+  cada `WARNING` (antes solo se contaba), con un atajo para verlos en
+  Registros filtrados por `RequestId`. El dashboard también los muestra.
+- Campo de bucket S3 y de ambiente en Ajustes, y botón que abre los registros
+  de una ejecución concreta.
+- Pruebas aisladas del cliente S3 con `URLProtocol`, y de las advertencias.
+
+### Cambiado
+
+- **Botones del onboarding unificados.** «Atrás», «Probar credenciales»,
+  «Comprobar función» y «Continuar» comparten componente, altura y formato.
+- **Texto del LED en la bienvenida** ahora explica para qué sirve (saber en qué
+  etapa está el robot) en lugar de enumerar colores.
+- La documentación usa nombres de archivo en inglés (`ARCHITECTURE.md`,
+  `TESTING.md`, `AI_USAGE.md`) con el contenido en español.
+
+### Corregido
+
+- **Rebote y parpadeo del formulario de credenciales.** Cada tecla reescribía
+  el borrador completo y reiniciaba los otros pasos; ahora solo se invalida lo
+  necesario. Revelar el secreto ya no destruye el campo ni pierde el foco.
+- **El LED de la barra de menús no se pintaba:** macOS lo trataba como imagen
+  plantilla y descartaba el color.
+- **Icono de la barra con identidad propia:** antena con ondas, LED de estado y
+  mástil. La silueta se entrega como plantilla (se adapta a la barra clara u
+  oscura) y el LED a color encima; mientras el robot ejecuta, las ondas laten.
+  Antes se usaba `wave.2.*`, un símbolo que no existe en SF Symbols, así que el
+  icono quedaba reducido a un punto.
+- **Rutas con espacios o tildes** se firmaban distintas a las enviadas, lo que
+  habría fallado al descargar archivos con nombres reales.
+- `ejecuciones.json` de versiones anteriores se descartaba al añadir
+  `warningMessages`; ahora se lee con tolerancia.
 
 ## [1.1.0] — 2026-10-21
 

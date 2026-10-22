@@ -15,6 +15,9 @@ enum TestCredential {
 final class StubURLProtocol: URLProtocol {
     nonisolated(unsafe) static var handler: ((URLRequest) -> (HTTPURLResponse, Data))?
     nonisolated(unsafe) static var lastRequest: URLRequest?
+    /// Todas las URLs pedidas, en orden. Sirve para comprobar los listados de
+    /// S3, que hacen varias llamadas por ejecución.
+    nonisolated(unsafe) static var requestedURLs: [URL] = []
 
     private static let lock = NSLock()
 
@@ -22,6 +25,7 @@ final class StubURLProtocol: URLProtocol {
         lock.lock()
         handler = nil
         lastRequest = nil
+        requestedURLs = []
         lock.unlock()
     }
 
@@ -43,6 +47,7 @@ final class StubURLProtocol: URLProtocol {
     override func startLoading() {
         Self.lock.lock()
         Self.lastRequest = request
+        if let url = request.url { Self.requestedURLs.append(url) }
         let handler = Self.handler
         Self.lock.unlock()
 

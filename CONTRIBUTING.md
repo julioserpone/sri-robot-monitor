@@ -18,7 +18,7 @@ que los cambios entren sin fricción.
 - Xcode 26 (Swift 6, *strict concurrency*).
 - Sin dependencias externas: el proyecto no usa paquetes Swift, ni siquiera el
   SDK de AWS. Mantenerlo así es parte del diseño (ver
-  [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)).
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
 
 ```bash
 git clone https://github.com/julioserpone/sri-robot-monitor.git
@@ -60,32 +60,34 @@ docs(arquitectura): explicar el modo tail
 
 ## Pruebas
 
-Antes de abrir el PR:
+Antes de abrir el PR, ejecuta la verificación completa **en tu Mac**:
 
 ```bash
-xcodebuild -project SriRobotMonitor.xcodeproj -scheme SriRobotMonitor \
-  -configuration Debug -destination 'platform=macOS' test
+./scripts/verify.sh
 ```
+
+Comprueba archivos obligatorios, secretos, nombres de documentos, compila y corre
+toda la suite. Con `--quick` solo revisa la higiene (instantáneo) y con
+`SKIP_TESTS=1` omite las pruebas. El CI de GitHub solo repite build y tests.
 
 Toda funcionalidad nueva trae pruebas. Si tocas el análisis de logs, la firma
 SigV4 o el decodificador de streams, **añade un caso que falle sin tu cambio**.
-Detalle en [docs/PRUEBAS.md](docs/PRUEBAS.md).
+Detalle en [docs/TESTING.md](docs/TESTING.md).
 
 ## Pull requests
 
-1. Rellena la plantilla completa (incluida la sección de IA).
-2. El PR debe pasar **todos** los checks de CI:
-   - `Documentación y convenciones`
-   - `Compilar y probar (macOS)`
-   - `Análisis de seguridad` (CodeQL)
-3. No requiere aprobaciones, pero sí checks en verde.
-4. Actualiza `CHANGELOG.md` en la sección `No publicado` cuando el cambio sea
+1. Verifica en local con `./scripts/verify.sh` y pega el resumen en el PR.
+2. Rellena la plantilla completa (incluida la sección de IA).
+3. El PR debe pasar el check `Compilar y probar (macOS)`.
+4. No requiere aprobaciones, pero sí el check en verde.
+5. **No fusiones el PR**: lo revisa y lo fusiona quien mantiene el proyecto.
+6. Actualiza `CHANGELOG.md` en la sección `No publicado` cuando el cambio sea
    visible para quien usa la app.
-5. Un PR, un tema. Si el diff se va de 400 líneas, probablemente haya que
+7. Un PR, un tema. Si el diff se va de 400 líneas, probablemente haya que
    partirlo.
 
 ## Uso de IA
 
 Se acepta y se anima a usar asistentes. La condición es que entiendas y puedas
-explicar cada línea que envías. Lee [docs/USO_IA.md](docs/USO_IA.md) y declara
+explicar cada línea que envías. Lee [docs/AI_USAGE.md](docs/AI_USAGE.md) y declara
 el uso en el PR.

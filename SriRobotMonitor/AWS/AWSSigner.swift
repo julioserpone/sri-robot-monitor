@@ -38,6 +38,16 @@ enum AWSSigner {
             request.setValue(token, forHTTPHeaderField: "X-Amz-Security-Token")
         }
 
+        let payloadHash = sha256Hex(request.httpBody ?? Data())
+
+        // S3 rechaza toda petición sin `x-amz-content-sha256`
+        // ("Missing required header for this request"). El resto de servicios
+        // lo aceptan, así que se envía siempre: es el mismo hash que ya entra
+        // en la petición canónica y no cuesta nada.
+        if request.value(forHTTPHeaderField: "x-amz-content-sha256") == nil {
+            request.setValue(payloadHash, forHTTPHeaderField: "x-amz-content-sha256")
+        }
+
         var headerValues: [String: String] = [:]
         for (name, value) in request.allHTTPHeaderFields ?? [:] {
             let lower = name.lowercased()
@@ -52,7 +62,6 @@ enum AWSSigner {
             .joined()
         let signedHeaders = signedHeaderNames.joined(separator: ";")
 
-        let payloadHash = sha256Hex(request.httpBody ?? Data())
         let canonicalRequest = [
             request.httpMethod?.uppercased() ?? "GET",
             canonicalPath(for: url),
@@ -104,6 +113,14 @@ enum AWSSigner {
 
     static func encodePathSegment(_ value: String) -> String {
         awsEncode(value)
+    }
+
+    /// Codifica una clave de S3 conservando las `/` de separación: cada
+    /// segmento se codifica por separado, como exige SigV4.
+    static func encodeS3Key(_ key: String) -> String {
+        key.split(separator: "/", omittingEmptySubsequences: false)
+            .map { awsEncode(String($0)) }
+            .joined(separator: "/")
     }
 
     static func sha256Hex(_ data: Data) -> String {
