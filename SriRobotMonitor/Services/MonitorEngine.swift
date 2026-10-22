@@ -955,8 +955,16 @@ final class MonitorEngine {
         panel.canCreateDirectories = true
         panel.isExtensionHidden = false
         panel.title = "Guardar \(object.kind.title)"
-        guard panel.runModal() == .OK, let url = panel.url else { return false }
-        try data.write(to: url, options: .atomic)
+        // `runModal()` dentro de una `Task` bloquea el hilo principal y deja la
+        // app sin responder (el panel aparece pero los clics no hacen nada).
+        // La API asíncrona lo presenta sin bloquear.
+        guard await panel.begin() == .OK, let url = panel.url else { return false }
+
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            throw DownloadError.writeFailed(url: url, underlying: error.localizedDescription)
+        }
         return true
     }
 
@@ -1018,6 +1026,18 @@ enum InvocationFailure: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .summaryFailed(message): "La ejecución terminó con fallos: \(message)"
+        }
+    }
+}
+
+/// Fallos al guardar un archivo descargado.
+enum DownloadError: LocalizedError {
+    case writeFailed(url: URL, underlying: String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .writeFailed(url, underlying):
+            "Se descargó el archivo, pero no se pudo escribir en \(url.path(percentEncoded: false)): \(underlying)"
         }
     }
 }

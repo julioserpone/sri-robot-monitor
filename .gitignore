@@ -13,6 +13,10 @@ Package.resolved
 .DS_Store
 ._*
 
+# Capturas temporales para reportar fallos
+error.png
+screenshot*.png
+
 # Secretos (nunca deben existir, pero por si acaso)
 .env
 .env.*

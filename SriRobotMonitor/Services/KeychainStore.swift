@@ -50,6 +50,7 @@ enum KeychainStore {
 
     static func save(_ secrets: StoredSecrets) throws {
         let data = Data(try JSONEncoder().encode(secrets))
+        removeLegacyEntryIfNeeded()
         try write(data)
         cache.lock.lock()
         cache.secrets = .some(secrets)
@@ -105,10 +106,25 @@ enum KeychainStore {
             kSecAttrAccount as String: account
         ]
 
-        let attributes: [String: Any] = [
+        // La entrada nace con "cualquier aplicación" en su lista de control de
+        // acceso. Con el valor por defecto solo la app que la creó puede leerla
+        // sin diálogo, y como la app cambia de firma entre compilaciones
+        // (Debug, Release, Xcode) macOS la trata como otra app y vuelve a pedir
+        // la contraseña aunque se haya pulsado "Always allow".
+        //
+        // `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` mantiene el
+        // secreto en este Mac y sin copiarlo a iCloud.
+        var attributes: [String: Any] = [
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
+        // Lista de acceso vacía = cualquier aplicación puede leer sin diálogo.
+        // `SecAccessCreate` no admite `nil` en los punteros de salida.
+        var access: SecAccess?
+        if SecAccessCreate("SRI Robot Monitor" as CFString, nil, &access) == errSecSuccess,
+           let access {
+            attributes[kSecAttrAccess as String] = access
+        }
 
         let status = SecItemCopyMatching(query as CFDictionary, nil)
         if status == errSecSuccess {
@@ -152,6 +168,22 @@ enum KeychainStore {
             throw KeychainError.unexpectedStatus(status)
         }
         return data
+    }
+
+    /// Reemplaza la entrada antigua por una con acceso abierto.
+    ///
+    /// Las versiones anteriores la creaban sin `kSecAttrAccess`, así que su
+    /// lista de control de acceso solo incluye al binario que la escribió:
+    /// cada nueva compilación vuelve a pedir la contraseña. Se borra y se vuelve
+    /// a crear; el momento de guardar ya es una acción explícita del usuario, en
+    /// la que un diálogo del sistema es esperable.
+    private static func removeLegacyEntryIfNeeded() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 
     static func delete() throws {

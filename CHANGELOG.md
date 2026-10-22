@@ -20,8 +20,15 @@ y el versionado [SemVer](https://semver.org/lang/es/).
 
 ### Corregido
 
-- El Llavero ya no pide la contraseña en cada lectura: los secretos se leen una
-  vez por lanzamiento y quedan en caché hasta que se guardan o se restablece.
+- **El Llavero ya no pide la contraseña del Mac cada vez.** La entrada se crea
+  con acceso abierto para cualquier aplicación de este Mac y no se copia a
+  iCloud (`…ThisDeviceOnly`). Con el valor por defecto solo el binario que la
+  creó podía leerla, así que cada compilación (Debug, Release, Xcode) contaba
+  como otra app y volvía a preguntar aunque se pulsara "Always allow".
+- **Descargar un archivo dejaba la app bloqueada.** `NSSavePanel.runModal()` se
+  llamaba dentro de una `Task` y bloqueaba el hilo principal: el panel aparecía
+  pero no respondía. Ahora usa la API asíncrona (`begin()`), y los fallos al
+  escribir el archivo se explican con la ruta concreta.
 - S3 exige `x-amz-content-sha256` y la app no lo enviaba, así que el explorador
   y la descarga de una ejecución fallaban con "Missing required header".
 
