@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 enum KeychainError: LocalizedError {
@@ -18,15 +19,61 @@ enum KeychainError: LocalizedError {
 
 /// Las claves de AWS y las del robot viven en el Llavero de macOS, ligadas a la
 /// app. El resto de datos (preferencias, historial y logs) vive en su contenedor.
+///
+/// Cada lectura del Llavero puede mostrar el diálogo del sistema pidiendo la
+/// contraseña de inicio de sesión ("SriRobotMonitor wants to use your
+/// confidential information"). Leerlo en cada ciclo del motor lanzaba ese
+/// diálogo varias veces por minuto y "Always allow" no siempre se respeta.
+/// Por eso los secretos se leen una sola vez por lanzamiento y se cachean aquí:
+/// cualquier guardado actualiza la caché y el resto de lecturas son en memoria.
 enum KeychainStore {
     static let service = "com.julioserpone.sri-robot-monitor"
     static let account = "aws-credentials"
 
-    static func save(_ secrets: StoredSecrets) throws {
-        try write(Data(try JSONEncoder().encode(secrets)))
+    /// Estado mutable de la caché, protegido por `lock`.
+    private final class Cache: @unchecked Sendable {
+        let lock = NSLock()
+        var secrets: StoredSecrets??
+        /// Contexto reutilizable para el diálogo del sistema. `LAContext` no es
+        /// `Sendable`, por eso vive aquí y se accede siempre con `lock`.
+        let context = LAContext()
     }
 
+    private static let cache = Cache()
+
+    private static func authenticationContext() -> LAContext {
+        cache.lock.lock()
+        defer { cache.lock.unlock() }
+        cache.context.interactionNotAllowed = false
+        return cache.context
+    }
+
+    static func save(_ secrets: StoredSecrets) throws {
+        let data = Data(try JSONEncoder().encode(secrets))
+        try write(data)
+        cache.lock.lock()
+        cache.secrets = .some(secrets)
+        cache.lock.unlock()
+    }
+
+    /// Devuelve los secretos sin volver a tocar el Llavero si ya se leyeron en
+    /// este lanzamiento.
     static func loadSecrets() throws -> StoredSecrets? {
+        cache.lock.lock()
+        let cached = cache.secrets
+        cache.lock.unlock()
+        if let cached {
+            return cached
+        }
+
+        let secrets = try readSecretsFromKeychain()
+        cache.lock.lock()
+        cache.secrets = .some(secrets)
+        cache.lock.unlock()
+        return secrets
+    }
+
+    private static func readSecretsFromKeychain() throws -> StoredSecrets? {
         guard let data = try read() else { return nil }
         if let secrets = try? JSONDecoder().decode(StoredSecrets.self, from: data) {
             return secrets
@@ -72,6 +119,10 @@ enum KeychainStore {
             return
         }
 
+        if status != errSecItemNotFound {
+            throw KeychainError.unexpectedStatus(status)
+        }
+
         var addQuery = query
         addQuery.merge(attributes) { _, new in new }
         let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
@@ -81,12 +132,15 @@ enum KeychainStore {
     }
 
     private static func read() throws -> Data? {
+        // Espera acotada: si el diálogo del sistema no se responde, devolvemos
+        // `errSecInteractionNotAllowed` en lugar de bloquear la app.
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseAuthenticationContext as String: Self.authenticationContext()
         ]
 
         var item: CFTypeRef?
@@ -110,5 +164,15 @@ enum KeychainStore {
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw KeychainError.unexpectedStatus(status)
         }
+        cache.lock.lock()
+        cache.secrets = .some(nil)
+        cache.lock.unlock()
+    }
+
+    /// Olvida la caché en memoria; la próxima lectura volverá al Llavero.
+    static func invalidateCache() {
+        cache.lock.lock()
+        cache.secrets = nil
+        cache.lock.unlock()
     }
 }
