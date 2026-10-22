@@ -32,6 +32,11 @@ struct SriRobotMonitorApp: App {
                     engine.selectedSection = .runs
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
+
+                Button("Ir a Archivos") {
+                    engine.selectedSection = .files
+                }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
             }
         }
 

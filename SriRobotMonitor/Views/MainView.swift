@@ -26,6 +26,8 @@ struct MainView: View {
             DashboardView()
         case .runs:
             RunsView()
+        case .files:
+            FilesView()
         case .logs:
             LogsView()
         case .settings:
@@ -145,6 +147,9 @@ struct SidebarView: View {
 
     private func badge(for section: AppSection) -> String? {
         switch section {
+        case .files:
+            let count = engine.bucketTree.flatMap(\.files).count
+            return count == 0 ? nil : "\(min(count, 99))"
         case .runs:
             return engine.runs.isEmpty ? nil : "\(min(engine.runs.count, 99))"
         case .logs:

@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B4B2C3D4E5F60718293A4B5C /* BucketExplorerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4B2C3D4E5F60718293A4B5D /* BucketExplorerTests.swift */; };
+		A3B2C3D4E5F60718293A4B5C /* FilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B2C3D4E5F60718293A4B5D /* FilesView.swift */; };
+		F2B2C3D4E5F60718293A4B5C /* BucketNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B2C3D4E5F60718293A4B5D /* BucketNode.swift */; };
 		E3B2C3D4E5F60718293A4B5C /* WarningsAndS3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3B2C3D4E5F60718293A4B5D /* WarningsAndS3Tests.swift */; };
 		D3B2C3D4E5F60718293A4B5C /* RunArtifactsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3B2C3D4E5F60718293A4B5D /* RunArtifactsView.swift */; };
 		C3B2C3D4E5F60718293A4B5C /* SetupControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3B2C3D4E5F60718293A4B5D /* SetupControls.swift */; };
@@ -59,6 +62,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		B4B2C3D4E5F60718293A4B5D /* BucketExplorerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BucketExplorerTests.swift; sourceTree = "<group>"; };
+		A3B2C3D4E5F60718293A4B5D /* FilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesView.swift; sourceTree = "<group>"; };
+		F2B2C3D4E5F60718293A4B5D /* BucketNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BucketNode.swift; sourceTree = "<group>"; };
 		E3B2C3D4E5F60718293A4B5D /* WarningsAndS3Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WarningsAndS3Tests.swift; sourceTree = "<group>"; };
 		D3B2C3D4E5F60718293A4B5D /* RunArtifactsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunArtifactsView.swift; sourceTree = "<group>"; };
 		C3B2C3D4E5F60718293A4B5D /* SetupControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupControls.swift; sourceTree = "<group>"; };
@@ -111,6 +117,7 @@
 				FBEC2D80F6FD46B54231BD38 /* RobotConfiguration.swift */,
 				E959155A87D94A9995A39306 /* RobotModels.swift */,
 				C1B2C3D4E5F60718293A4B5D /* RobotEnvironment.swift */,
+				F2B2C3D4E5F60718293A4B5D /* BucketNode.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -154,6 +161,7 @@
 				C1F31E83C8D01EFD6222C67F /* RevalidateCredentialsSheet.swift */,
 				3B4DC1E9C42AD276FB8D0A8D /* RunsView.swift */,
 				D34CA38270BBB82BA742AA69 /* SettingsView.swift */,
+				A3B2C3D4E5F60718293A4B5D /* FilesView.swift */,
 				C3B2C3D4E5F60718293A4B5D /* SetupControls.swift */,
 				D3B2C3D4E5F60718293A4B5D /* RunArtifactsView.swift */,
 			);
@@ -205,6 +213,7 @@
 			isa = PBXGroup;
 			children = (
 				D1B2C3D4E5F60718293A4B5D /* CoreLogicTests.swift */,
+				B4B2C3D4E5F60718293A4B5D /* BucketExplorerTests.swift */,
 				E3B2C3D4E5F60718293A4B5D /* WarningsAndS3Tests.swift */,
 				A2B2C3D4E5F60718293A4B5D /* AWSClientsTests.swift */,
 				E1B2C3D4E5F60718293A4B5D /* SnapshotDumpTests.swift */,
@@ -327,6 +336,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D1B2C3D4E5F60718293A4B5C /* CoreLogicTests.swift in Sources */,
+				B4B2C3D4E5F60718293A4B5C /* BucketExplorerTests.swift in Sources */,
 				E3B2C3D4E5F60718293A4B5C /* WarningsAndS3Tests.swift in Sources */,
 				A2B2C3D4E5F60718293A4B5C /* AWSClientsTests.swift in Sources */,
 				E1B2C3D4E5F60718293A4B5C /* SnapshotDumpTests.swift in Sources */,
@@ -342,6 +352,8 @@
 				BB0015969DC7428F6051CEBC /* AWSClient.swift in Sources */,
 				E2EDBE7A389E8EAECC03E12A /* AWSCredentials.swift in Sources */,
 				DDCA1C98D922D323131B670C /* AWSSigner.swift in Sources */,
+				A3B2C3D4E5F60718293A4B5C /* FilesView.swift in Sources */,
+				F2B2C3D4E5F60718293A4B5C /* BucketNode.swift in Sources */,
 				D3B2C3D4E5F60718293A4B5C /* RunArtifactsView.swift in Sources */,
 				C3B2C3D4E5F60718293A4B5C /* SetupControls.swift in Sources */,
 				B3B2C3D4E5F60718293A4B5C /* S3Client.swift in Sources */,

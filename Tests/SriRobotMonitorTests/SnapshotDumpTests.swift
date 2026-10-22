@@ -164,6 +164,7 @@ private struct ScreenShell: View {
         switch section {
         case .dashboard: DashboardView()
         case .runs: RunsView()
+        case .files: FilesView()
         case .logs: LogsView()
         case .settings: SettingsView()
         }

@@ -1,12 +1,12 @@
 import AppKit
 import Foundation
-import AppKit
 import Observation
 import UserNotifications
 
 enum AppSection: String, CaseIterable, Identifiable, Sendable {
     case dashboard
     case runs
+    case files
     case logs
     case settings
 
@@ -16,6 +16,7 @@ enum AppSection: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .dashboard: "Panel"
         case .runs: "Ejecuciones"
+        case .files: "Archivos"
         case .logs: "Registros"
         case .settings: "Configuración"
         }
@@ -25,6 +26,7 @@ enum AppSection: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .dashboard: "Estado del robot en tiempo real"
         case .runs: "Historial reconstruido desde CloudWatch"
+        case .files: "Contenido del bucket configurado"
         case .logs: "Flujo de CloudWatch Logs"
         case .settings: "Credenciales, conexión y datos"
         }
@@ -34,6 +36,7 @@ enum AppSection: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .dashboard: "gauge.with.dots.needle.67percent"
         case .runs: "clock.arrow.circlepath"
+        case .files: "folder.fill"
         case .logs: "text.alignleft"
         case .settings: "gearshape.fill"
         }
@@ -51,6 +54,11 @@ final class MonitorEngine {
     /// Artefactos (TXT y JSON) encontrados en S3 para cada ejecución.
     var artifacts: [String: [S3Object]] = [:]
     var artifactErrors: [String: String] = [:]
+    /// Árbol del bucket para el explorador de archivos.
+    var bucketTree: [BucketNode] = []
+    var bucketLoading = false
+    var bucketError: String?
+    var bucketLoadedAt: Date?
     var callerIdentity: CallerIdentity?
     var functionInfo: LambdaFunctionInfo?
     var runs: [RobotRun] = []
@@ -836,6 +844,53 @@ final class MonitorEngine {
             requestID: requestID == "—" ? nil : requestID
         )
         logs.append(entry)
+    }
+
+    // MARK: - Explorador de archivos
+
+    /// Carga el listado del bucket completo (hasta el tope de S3 por llamada)
+    /// y lo convierte en un árbol de carpetas.
+    func loadBucketTree(force: Bool = false) async {
+        guard let credentials, credentials.isComplete else { return }
+        guard !configuration.bucketName.isEmpty else {
+            bucketError = "Indica el bucket de S3 en Ajustes para explorar los archivos."
+            bucketTree = []
+            return
+        }
+        if bucketLoading { return }
+        if !force, let bucketLoadedAt, Date().timeIntervalSince(bucketLoadedAt) < 120 { return }
+
+        bucketLoading = true
+        bucketError = nil
+        defer { bucketLoading = false }
+
+        let client = S3Client(
+            credentials: credentials,
+            region: configuration.region,
+            session: session
+        )
+        do {
+            var objects: [S3Object] = []
+            var token: String?
+            var pages = 0
+            repeat {
+                let page = try await client.listObjects(
+                    bucket: configuration.bucketName,
+                    prefix: "",
+                    continuationToken: token
+                )
+                objects.append(contentsOf: page.objects)
+                token = page.nextToken
+                pages += 1
+            } while token != nil && pages < 10
+
+            bucketTree = BucketNode.build(from: objects)
+            bucketLoadedAt = Date()
+        } catch let error as AWSAPIError {
+            bucketError = error.friendlyMessage
+        } catch {
+            bucketError = error.localizedDescription
+        }
     }
 
     // MARK: - Descarga de artefactos

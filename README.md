@@ -50,6 +50,15 @@ Parecida en espíritu a *Laravel Herd*: se instala, se configura una vez, y desd
 
 `logs:StartLiveTail` es opcional: sin ese permiso la app funciona con sondeo y lo indica en pantalla. Los permisos de S3 solo hacen falta para descargar el TXT y el JSON de una ejecución.
 
+## Antes de contribuir
+
+```bash
+./scripts/verify.sh
+```
+
+Una sola orden: comprueba archivos y convenciones, compila y corre toda la suite
+en tu Mac. El CI de GitHub solo repite build y tests.
+
 ## Instalación
 
 ### Desde el DMG

@@ -4,8 +4,28 @@ import Foundation
 struct S3Object: Identifiable, Sendable, Hashable {
     let bucket: String
     let key: String
+    /// Metadatos que devuelve el listado. Sirven para ordenar y para mostrar
+    /// el tamaño en el explorador; no hacen falta para descargar.
+    var size: Int?
+    var lastModified: Date?
+
+    init(bucket: String, key: String, size: Int? = nil, lastModified: Date? = nil) {
+        self.bucket = bucket
+        self.key = key
+        self.size = size
+        self.lastModified = lastModified
+    }
 
     var id: String { "\(bucket)/\(key)" }
+
+    /// Tamaño legible (`1,2 MB`).
+    var sizeText: String? {
+        guard let size else { return nil }
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        formatter.allowedUnits = [.useKB, .useMB]
+        return formatter.string(fromByteCount: Int64(size))
+    }
 
     var fileName: String {
         key.split(separator: "/").last.map(String.init) ?? key
@@ -107,6 +127,15 @@ struct S3Client: Sendable {
 
     /// Lista hasta 1 000 claves bajo un prefijo.
     func listKeys(bucket: String, prefix: String, continuationToken: String? = nil) async throws -> [String] {
+        try await listObjects(bucket: bucket, prefix: prefix, continuationToken: continuationToken).keys
+    }
+
+    /// Una página del listado: claves y marcador para pedir la siguiente.
+    func listObjects(
+        bucket: String,
+        prefix: String = "",
+        continuationToken: String? = nil
+    ) async throws -> (objects: [S3Object], keys: [String], nextToken: String?) {
         let query = Self.listQuery(prefix: prefix, token: continuationToken)
         let response = try await client.send(
             service: .s3,
@@ -125,7 +154,15 @@ struct S3Client: Sendable {
                 message: "No se pudo leer el listado de S3."
             )
         }
-        return decoder.keys
+        let objects = decoder.keys.map {
+            S3Object(
+                bucket: bucket,
+                key: $0,
+                size: decoder.sizes[$0],
+                lastModified: decoder.dates[$0]
+            )
+        }
+        return (objects, decoder.keys, decoder.nextToken)
     }
 
     /// Descarga un objeto completo.
@@ -166,8 +203,27 @@ struct S3Client: Sendable {
 
 private final class S3ListParser: NSObject, XMLParserDelegate {
     private(set) var keys: [String] = []
+    private(set) var nextToken: String?
+    /// Tamaño y fecha de cada clave, en el mismo orden que `keys`.
+    private(set) var sizes: [String: Int] = [:]
+    private(set) var dates: [String: Date] = [:]
     private var current = ""
     private var buffer = ""
+    private var currentKey: String?
+
+    /// `ISO8601DateFormatter` no es `Sendable`, así que se crea por llamada en
+    /// lugar de compartirlo: el listado trae pocas fechas.
+    private static func parseDate(_ value: String) -> Date? {
+        for options: ISO8601DateFormatter.Options in [
+            [.withInternetDateTime, .withFractionalSeconds],
+            [.withInternetDateTime]
+        ] {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = options
+            if let date = formatter.date(from: value) { return date }
+        }
+        return nil
+    }
 
     func parser(
         _ parser: XMLParser,
@@ -190,9 +246,23 @@ private final class S3ListParser: NSObject, XMLParserDelegate {
         namespaceURI: String?,
         qualifiedName qName: String?
     ) {
-        if elementName == "Key" {
-            let key = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !key.isEmpty { keys.append(key) }
+        let value = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch elementName {
+        case "Key":
+            if !value.isEmpty {
+                keys.append(value)
+                currentKey = value
+            }
+        case "Size":
+            if let key = currentKey, let size = Int(value) { sizes[key] = size }
+        case "LastModified":
+            if let key = currentKey, let date = Self.parseDate(value) {
+                dates[key] = date
+            }
+        case "NextContinuationToken":
+            if !value.isEmpty { nextToken = value }
+        default:
+            break
         }
         current = ""
         buffer = ""

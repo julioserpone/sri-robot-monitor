@@ -96,13 +96,33 @@ open ~/Library/Containers/com.julioserpone.sri-robot-monitor/Data/tmp/sri-snapsh
   regresión visual.
 - Firma y notarización del DMG.
 
+## Verificación local (la vía principal)
+
+Antes de subir nada:
+
+```bash
+./scripts/verify.sh
+```
+
+Hace, en un solo paso: archivos obligatorios, plantillas, secretos, `AKIA…`,
+nombres de documentos en inglés, YAML de `.github`, compilación y suite completa.
+Sale con código ≠ 0 si algo falla, así que sirve también en un hook o en un
+alias.
+
+| Orden | Qué hace |
+|---|---|
+| `./scripts/verify.sh` | Todo |
+| `./scripts/verify.sh --quick` | Solo higiene, sin compilar |
+| `SKIP_TESTS=1 ./scripts/verify.sh` | Compila, no corre pruebas |
+
 ## CI
 
-Cada push a `main` y cada PR ejecutan:
+Solo los PR hacia `main` disparan el workflow, y solo tiene un job:
+**Compilar y probar (macOS)** sobre `macos-26`.
 
-1. **Documentación y convenciones** — archivos obligatorios, plantillas,
-   ausencia de secretos y de `AKIA…` en el código.
-2. **Compilar y probar (macOS)** — build + suite completa sobre `macos-15`.
-3. **Análisis de seguridad** — CodeQL para Swift.
+La higiene y CodeQL se retiraron a propósito: CodeQL compilaba todo el proyecto
+para el análisis y consumía la cuota gratuita (más de 10 minutos por ejecución).
+Para el chequeo de seguridad, usa el Mac.
 
-Un PR no se fusiona si algún check está en rojo. No hacen falta aprobaciones.
+Un PR no se fusiona si ese check está en rojo. No hacen falta aprobaciones, pero
+**quien mantiene el proyecto es quien fusiona**: no lo hagas desde el PR.

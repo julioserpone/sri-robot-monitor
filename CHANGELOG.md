@@ -6,6 +6,31 @@ y el versionado [SemVer](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Añadido
+
+- `scripts/verify.sh`: verificación local completa (higiene, compilación y
+  pruebas) para ejecutar antes de subir, sin gastar minutos de Actions.
+- Explorador de archivos del bucket en el menú lateral, con búsqueda, tamaños,
+  fechas y descarga de cada objeto.
+
+### Cambiado
+
+- El CI de GitHub solo compila y prueba en macOS, y solo en los PR.
+- Regla de `main`: el único check obligatorio es `Compilar y probar (macOS)`.
+
+### Corregido
+
+- El Llavero ya no pide la contraseña en cada lectura: los secretos se leen una
+  vez por lanzamiento y quedan en caché hasta que se guardan o se restablece.
+- S3 exige `x-amz-content-sha256` y la app no lo enviaba, así que el explorador
+  y la descarga de una ejecución fallaban con "Missing required header".
+
+### Retirado
+
+- **CodeQL**: compilaba el proyecto entero y consumía la cuota gratuita (más de
+  10 minutos por ejecución). La auditoría se hace en local con `verify.sh`.
+- El job de higiene en Ubuntu: lo cubre `verify.sh --quick` al instante.
+
 ### Pendiente
 
 - Firma y notarización de las builds publicadas.

@@ -1,8 +1,16 @@
 name: CI
 
+# Verificación en GitHub: compila y corre las pruebas en macOS.
+#
+# La higiene (documentos, secretos, YAML) se comprueba en local con
+# `./scripts/verify.sh --quick`, que es instantáneo y no gasta minutos.
+# Aquí solo queda lo que sí necesita un Mac de verdad.
+#
+# CodeQL se retiró: con Swift compila el proyecto entero y consumía la cuota
+# gratuita (más de 10 minutos por ejecución) para poco valor en una app local.
+# Para auditar seguridad, ejecuta `./scripts/verify.sh` en el Mac.
+
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -15,68 +23,15 @@ permissions:
   contents: read
 
 jobs:
-  # Verificaciones rápidas que no necesitan compilar.
-  hygiene:
-    name: Documentación y convenciones
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Archivos obligatorios
-        run: |
-          set -euo pipefail
-          missing=0
-          for file in README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md \
-                      LICENSE docs/ARCHITECTURE.md docs/TESTING.md docs/AI_USAGE.md \
-                      .github/pull_request_template.md .github/dependabot.yml \
-                      .github/workflows/ci.yml .github/rulesets/main.json; do
-            if [ ! -f "$file" ]; then
-              echo "::error file=$file::Falta $file"
-              missing=1
-            fi
-          done
-          exit $missing
-
-      - name: Plantillas de issues y PR
-        run: |
-          set -euo pipefail
-          test -f .github/ISSUE_TEMPLATE/bug_report.yml
-          test -f .github/ISSUE_TEMPLATE/feature_request.yml
-          test -f .github/ISSUE_TEMPLATE/config.yml
-          test -f .github/pull_request_template.md
-
-      - name: Sin secretos obvios versionados
-        run: |
-          set -euo pipefail
-          if git ls-files | grep -E '(^|/)(\.env$|.*\.p12$|.*\.pem$|id_rsa$)'; then
-            echo "::error::Hay archivos sensibles versionados."
-            exit 1
-          fi
-
-      - name: Sin credenciales AWS en el código
-        run: |
-          set -euo pipefail
-          # `TestCredential` concentra la clave de ejemplo de la documentación de
-          # AWS y la construye por concatenación, así que no aparece literal.
-          if grep -RInE 'AKIA[0-9A-Z]{16}' --include='*.swift' SriRobotMonitor Tests; then
-            echo "::error::Posible Access Key ID de AWS en el código."
-            exit 1
-          fi
-
   build-and-test:
     name: Compilar y probar (macOS)
     runs-on: macos-26
-    needs: hygiene
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - name: Entorno
-        run: |
-          set -euo pipefail
-          uname -m
-          sw_vers
-          xcodebuild -version
-          swift --version
+      - name: Resolver dependencias
+        run: xcodebuild -project SriRobotMonitor.xcodeproj -scheme SriRobotMonitor -resolvePackageDependencies
 
       - name: Compilar
         run: |
@@ -110,13 +65,7 @@ jobs:
             tail -60 test.log
             exit 1
           fi
-
-      - name: Resumen de pruebas
-        if: always()
-        run: |
-          if [ -f test.log ]; then
-            grep -E 'Executed [0-9]+ test' test.log | tail -1 >> "$GITHUB_STEP_SUMMARY" || true
-          fi
+          grep -E 'Executed [0-9]+ test' test.log | tail -1 >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Subir resultados de pruebas
         if: always()
@@ -125,13 +74,4 @@ jobs:
           name: test-results
           path: TestResults.xcresult
           if-no-files-found: ignore
-          retention-days: 14
-
-      - name: Subir app compilada
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: SriRobotMonitor-debug
-          path: build/Build/Products/Debug/SriRobotMonitor.app
-          if-no-files-found: error
           retention-days: 7
