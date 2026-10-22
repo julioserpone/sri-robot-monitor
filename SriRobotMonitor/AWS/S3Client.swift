@@ -69,10 +69,18 @@ struct S3Client: Sendable {
 
     /// Busca TXT y JSON de una ejecución.
     ///
-    /// El robot publica en
-    /// `facturas-recibidas/{ambiente}/{año}/{mes}/raw/` los TXT y en
-    /// `facturas-recibidas/{ambiente}/{año}/{mes}/manifest/` los JSON. Se
-    /// buscan ambos prefijos y se cruzan por RUC y período.
+    /// El layout real del robot es:
+    ///
+    /// ```
+    /// {ambiente}/{timestamp}/{año-mes}/facturas-recibidas-{año-mes}.txt
+    /// {ambiente}/{timestamp}/{año-mes}/…claves….json
+    /// ```
+    ///
+    /// (por ejemplo `produccion/1758871873001/2026-05/facturas-recibidas-2026-05.txt`).
+    /// El `timestamp` es distinto en cada ejecución, así que se lista el mes
+    /// completo y se filtra por el período. Se prueban además los layouts
+    /// anteriores (`facturas-recibidas/{ambiente}/{año}/{mes}/raw|manifest/`)
+    /// para no romper con buckets ya existentes.
     func findArtifacts(
         bucket: String,
         environment: String,
@@ -80,39 +88,33 @@ struct S3Client: Sendable {
         ruc: String?
     ) async throws -> [S3Object] {
         guard !periods.isEmpty else { return [] }
-        var objects: [S3Object] = []
 
+        var prefixes: [String] = []
         for period in periods {
-            for folder in ["raw", "manifest"] {
-                let prefix = String(
-                    format: "facturas-recibidas/%@/%@/%@/%@/",
-                    environment,
-                    String(period.prefix(4)),
-                    String(period.suffix(2)),
-                    folder
-                )
-                let keys = try await listKeys(bucket: bucket, prefix: prefix)
-                for key in keys {
-                    if let ruc, !key.contains(ruc) { continue }
-                    objects.append(S3Object(bucket: bucket, key: key))
-                }
+            let year = String(period.prefix(4))
+            let month = String(period.suffix(2))
+            // Layout actual: solo el ambiente, porque el timestamp de la
+            // ejecución cambia en cada corrida y no se conoce de antemano.
+            prefixes.append("\(environment)/")
+            // Layout anterior, por si el bucket es antiguo.
+            prefixes.append("facturas-recibidas/\(environment)/\(year)/\(month)/raw/")
+            prefixes.append("facturas-recibidas/\(environment)/\(year)/\(month)/manifest/")
+        }
+
+        var objects: [S3Object] = []
+        for prefix in Set(prefixes) {
+            let keys = try await listKeys(bucket: bucket, prefix: prefix)
+            for key in keys where Self.matches(key: key, periods: periods, ruc: ruc) {
+                objects.append(S3Object(bucket: bucket, key: key))
             }
         }
 
-        // Si el ambiente o el layout no coincide, se intenta un barrido más
-        // ancho por RUC + período antes de rendirse.
+        // Si el ambiente configurado no coincide con el de la ruta, se busca el
+        // período en todo el bucket antes de rendirse.
         if objects.isEmpty {
-            for period in periods {
-                let prefix = String(
-                    format: "facturas-recibidas/%@/%@/",
-                    String(period.prefix(4)),
-                    String(period.suffix(2))
-                )
-                let keys = try await listKeys(bucket: bucket, prefix: prefix)
-                for key in keys where key.hasSuffix(".txt") || key.hasSuffix(".json") {
-                    if let ruc, !key.contains(ruc) { continue }
-                    objects.append(S3Object(bucket: bucket, key: key))
-                }
+            let root = try await listKeys(bucket: bucket, prefix: "")
+            for key in root where Self.matches(key: key, periods: periods, ruc: ruc) {
+                objects.append(S3Object(bucket: bucket, key: key))
             }
         }
 
@@ -123,6 +125,20 @@ struct S3Client: Sendable {
             unique[object.kind] = object
         }
         return unique.values.sorted { $0.kind.rawValue < $1.kind.rawValue }
+    }
+
+    /// Una clave pertenece a la ejecución si su ruta contiene el mes (`2026-05`
+    /// o `2026/05`) y, si se conoce el RUC, también lo menciona.
+    static func matches(key: String, periods: [String], ruc: String?) -> Bool {
+        let lower = key.lowercased()
+        guard lower.hasSuffix(".txt") || lower.hasSuffix(".json") else { return false }
+        if let ruc, !ruc.isEmpty, !key.contains(ruc) { return false }
+        guard !periods.isEmpty else { return true }
+        return periods.contains { period in
+            let compact = String(period.prefix(7))          // 2026-05
+            let slashed = period.prefix(4) + "/" + period.suffix(2) // 2026/05
+            return lower.contains(compact.lowercased()) || lower.contains(slashed)
+        }
     }
 
     /// Lista hasta 1 000 claves bajo un prefijo.

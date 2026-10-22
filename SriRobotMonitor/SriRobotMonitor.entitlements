@@ -4,7 +4,11 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
-	<key>com.apple.security.files.user-selected.read-only</key>
+	<!-- Lectura y escritura: la app muestra NSSavePanel para guardar el TXT y el
+	     JSON descargados. Con `read-only` macOS rechaza el panel con
+	     "your app has the User Selected File Read entitlement but it needs
+	     User Selected File Read/Write". -->
+	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>

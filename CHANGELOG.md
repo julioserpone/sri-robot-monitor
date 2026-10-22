@@ -25,6 +25,13 @@ y el versionado [SemVer](https://semver.org/lang/es/).
   iCloud (`…ThisDeviceOnly`). Con el valor por defecto solo el binario que la
   creó podía leerla, así que cada compilación (Debug, Release, Xcode) contaba
   como otra app y volvía a preguntar aunque se pulsara "Always allow".
+- **El panel de guardar no aparecía en builds con sandbox.** Solo había
+  `files.user-selected.read-only`; `NSSavePanel` exige `read-write`. Confirmado
+  en el binario firmado con `codesign -d --entitlements`.
+- **La búsqueda de archivos usaba un layout de S3 que no existe.** Las claves
+  reales son `{ambiente}/{timestamp}/{año-mes}/facturas-recibidas-{año-mes}.txt`
+  (por ejemplo `produccion/1758871873001/2026-05/…`). Ahora se lista por
+  ambiente y se filtra por mes y RUC; los layouts antiguos siguen funcionando.
 - **Descargar un archivo dejaba la app bloqueada.** `NSSavePanel.runModal()` se
   llamaba dentro de una `Task` y bloqueaba el hilo principal: el panel aparecía
   pero no respondía. Ahora usa la API asíncrona (`begin()`), y los fallos al
@@ -37,6 +44,9 @@ y el versionado [SemVer](https://semver.org/lang/es/).
 - **CodeQL**: compilaba el proyecto entero y consumía la cuota gratuita (más de
   10 minutos por ejecución). La auditoría se hace en local con `verify.sh`.
 - El job de higiene en Ubuntu: lo cubre `verify.sh --quick` al instante.
+  Además pedía `docs/ARQUITECTURA.md`, `docs/PRUEBAS.md` y `docs/USO_IA.md`,
+  que ya no existen: habría fallado en cada PR.
+- El disparador en `push` a `main`: main solo recibe cambios por PR.
 
 ### Pendiente
 

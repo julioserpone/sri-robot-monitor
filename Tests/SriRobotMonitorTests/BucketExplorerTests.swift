@@ -178,3 +178,64 @@ final class BucketNodeTests: XCTestCase {
         XCTAssertTrue(august.contains { $0.node.path.contains("202608_factura.txt") })
     }
 }
+
+/// El layout real del bucket de produccion. Antes se buscaba
+/// `facturas-recibidas/{anio}/{mes}/` y la app no encontraba nada.
+final class S3LayoutTests: XCTestCase {
+    private let credentials = AWSCredentials(
+        accessKeyID: TestCredential.exampleAccessKey,
+        secretAccessKey: TestCredential.exampleSecret
+    )
+    private let realKey = "produccion/1758871873001/2026-05/facturas-recibidas-2026-05.txt"
+
+    override func setUp() {
+        super.setUp()
+        StubURLProtocol.reset()
+    }
+
+    override func tearDown() {
+        StubURLProtocol.reset()
+        super.tearDown()
+    }
+
+    func testRealKeyMatchesThePeriod() {
+        XCTAssertTrue(S3Client.matches(key: realKey, periods: ["2026-05"], ruc: nil))
+        XCTAssertFalse(S3Client.matches(key: realKey, periods: ["2026-04"], ruc: nil))
+        XCTAssertFalse(S3Client.matches(key: realKey, periods: ["2026-05"], ruc: "0102"))
+    }
+
+    func testFindArtifactsFindsTheProductionFile() async throws {
+        let listing = """
+        <ListBucketResult>
+          <Contents><Key>produccion/1758871873001/2026-05/facturas-recibidas-2026-05.txt</Key></Contents>
+          <Contents><Key>produccion/1758871873001/2026-05/claves-2026-05.json</Key></Contents>
+          <Contents><Key>produccion/1758871873001/2026-04/facturas-recibidas-2026-04.txt</Key></Contents>
+        </ListBucketResult>
+        """
+        StubURLProtocol.configure { _ in (Self.response(200), Data(listing.utf8)) }
+
+        let objects = try await S3Client(
+            credentials: credentials,
+            region: "us-east-1",
+            session: StubURLProtocol.session
+        ).findArtifacts(
+            bucket: "sri-txt-robot-076767082111-produccion",
+            environment: "produccion",
+            periods: ["2026-05"],
+            ruc: nil
+        )
+
+        XCTAssertEqual(objects.first { $0.kind == .txt }?.key, realKey)
+        XCTAssertEqual(objects.first { $0.kind == .json }?.fileName, "claves-2026-05.json")
+        XCTAssertFalse(objects.contains { $0.key.contains("2026-04") }, "No debe mezclar otros meses")
+    }
+
+    private static func response(_ status: Int) -> HTTPURLResponse {
+        HTTPURLResponse(
+            url: URL(string: "https://example.com")!,
+            statusCode: status,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "application/xml"]
+        )!
+    }
+}

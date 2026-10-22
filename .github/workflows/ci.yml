@@ -1,14 +1,17 @@
 name: CI
 
-# Verificación en GitHub: compila y corre las pruebas en macOS.
+# Compila y corre las pruebas en macOS. Solo en pull requests: la rama main
+# recibe código únicamente a través de PR, así que un push a main no vuelve a
+# gastar minutos de Actions.
 #
 # La higiene (documentos, secretos, YAML) se comprueba en local con
-# `./scripts/verify.sh --quick`, que es instantáneo y no gasta minutos.
-# Aquí solo queda lo que sí necesita un Mac de verdad.
+# `./scripts/verify.sh --quick`, que es instantáneo y no gasta cuota.
 #
-# CodeQL se retiró: con Swift compila el proyecto entero y consumía la cuota
+# CodeQL se retiró: con Swift compila el proyecto entero y consume la cuota
 # gratuita (más de 10 minutos por ejecución) para poco valor en una app local.
-# Para auditar seguridad, ejecuta `./scripts/verify.sh` en el Mac.
+#
+# Las actions están en v7 (releases de 2026), que corren sobre Node 24 y ya no
+# emiten el aviso de deprecación de Node 20.
 
 on:
   pull_request:
@@ -26,12 +29,15 @@ jobs:
   build-and-test:
     name: Compilar y probar (macOS)
     runs-on: macos-26
+    # Sin límite, un build colgado consume la cuota hasta el máximo de 6 h.
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - name: Resolver dependencias
-        run: xcodebuild -project SriRobotMonitor.xcodeproj -scheme SriRobotMonitor -resolvePackageDependencies
+      - name: Entorno
+        run: |
+          sw_vers
+          xcodebuild -version
 
       - name: Compilar
         run: |
@@ -69,7 +75,7 @@ jobs:
 
       - name: Subir resultados de pruebas
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: TestResults.xcresult
