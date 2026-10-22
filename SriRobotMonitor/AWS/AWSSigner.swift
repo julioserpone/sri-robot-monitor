@@ -106,6 +106,14 @@ enum AWSSigner {
         awsEncode(value)
     }
 
+    /// Codifica una clave de S3 conservando las `/` de separación: cada
+    /// segmento se codifica por separado, como exige SigV4.
+    static func encodeS3Key(_ key: String) -> String {
+        key.split(separator: "/", omittingEmptySubsequences: false)
+            .map { awsEncode(String($0)) }
+            .joined(separator: "/")
+    }
+
     static func sha256Hex(_ data: Data) -> String {
         Data(SHA256.hash(data: data)).hexString
     }

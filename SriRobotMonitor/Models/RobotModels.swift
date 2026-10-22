@@ -165,6 +165,9 @@ struct RobotRun: Identifiable, Codable, Hashable, Sendable {
     var finished: Bool
     var timedOut: Bool
     var failureMessages: [String]
+    /// Qué advertencias concretas hubo. Antes solo se contaban, así que la app
+    /// decía "advertencia" sin poder explicar cuál.
+    var warningMessages: [String] = []
     var logStreamName: String?
     var isDerived: Bool
 
@@ -192,6 +195,105 @@ struct RobotRun: Identifiable, Codable, Hashable, Sendable {
         if let ruc { parts.append("RUC \(ruc)") }
         parts.append(periodText)
         return parts.joined(separator: " · ")
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, requestID, startedAt, endedAt, durationMilliseconds, status, periods,
+             environment, ruc, downloads, totalKeys, failures, warningCount, errorCount,
+             finished, timedOut, failureMessages, warningMessages, logStreamName, isDerived
+    }
+
+    init(
+        id: String,
+        requestID: String,
+        startedAt: Date,
+        endedAt: Date?,
+        durationMilliseconds: Int?,
+        status: RobotStatus,
+        periods: [String],
+        environment: String?,
+        ruc: String?,
+        downloads: Int,
+        totalKeys: Int,
+        failures: Int,
+        warningCount: Int,
+        errorCount: Int,
+        finished: Bool,
+        timedOut: Bool,
+        failureMessages: [String],
+        warningMessages: [String] = [],
+        logStreamName: String?,
+        isDerived: Bool
+    ) {
+        self.id = id
+        self.requestID = requestID
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.durationMilliseconds = durationMilliseconds
+        self.status = status
+        self.periods = periods
+        self.environment = environment
+        self.ruc = ruc
+        self.downloads = downloads
+        self.totalKeys = totalKeys
+        self.failures = failures
+        self.warningCount = warningCount
+        self.errorCount = errorCount
+        self.finished = finished
+        self.timedOut = timedOut
+        self.failureMessages = failureMessages
+        self.warningMessages = warningMessages
+        self.logStreamName = logStreamName
+        self.isDerived = isDerived
+    }
+
+    /// Tolerante con `ejecuciones.json` de versiones anteriores: si falta
+    /// `warningMessages`, se usa una lista vacía en vez de perder el historial.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        requestID = try container.decode(String.self, forKey: .requestID)
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+        endedAt = try container.decodeIfPresent(Date.self, forKey: .endedAt)
+        durationMilliseconds = try container.decodeIfPresent(Int.self, forKey: .durationMilliseconds)
+        status = try container.decode(RobotStatus.self, forKey: .status)
+        periods = try container.decodeIfPresent([String].self, forKey: .periods) ?? []
+        environment = try container.decodeIfPresent(String.self, forKey: .environment)
+        ruc = try container.decodeIfPresent(String.self, forKey: .ruc)
+        downloads = try container.decodeIfPresent(Int.self, forKey: .downloads) ?? 0
+        totalKeys = try container.decodeIfPresent(Int.self, forKey: .totalKeys) ?? 0
+        failures = try container.decodeIfPresent(Int.self, forKey: .failures) ?? 0
+        warningCount = try container.decodeIfPresent(Int.self, forKey: .warningCount) ?? 0
+        errorCount = try container.decodeIfPresent(Int.self, forKey: .errorCount) ?? 0
+        finished = try container.decodeIfPresent(Bool.self, forKey: .finished) ?? false
+        timedOut = try container.decodeIfPresent(Bool.self, forKey: .timedOut) ?? false
+        failureMessages = try container.decodeIfPresent([String].self, forKey: .failureMessages) ?? []
+        warningMessages = try container.decodeIfPresent([String].self, forKey: .warningMessages) ?? []
+        logStreamName = try container.decodeIfPresent(String.self, forKey: .logStreamName)
+        isDerived = try container.decodeIfPresent(Bool.self, forKey: .isDerived) ?? false
+    }
+
+    /// Por qué el LED está naranja, en una línea legible.
+    var warningSummary: String? {
+        guard warningCount > 0 else { return nil }
+        if let first = warningMessages.first {
+            return warningCount > 1
+                ? "\(first) (y \(warningCount - 1) más)"
+                : first
+        }
+        return "\(warningCount) advertencia(s) en los logs"
+    }
+
+    /// Texto de alerta/notificación que explica el estado sin ambigüedad.
+    var statusExplanation: String? {
+        switch status {
+        case .warning:
+            return warningSummary
+        case .error:
+            return failureMessages.first
+        default:
+            return nil
+        }
     }
 
     private static func format(duration: TimeInterval) -> String {

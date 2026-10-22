@@ -18,6 +18,7 @@ Parecida en espíritu a *Laravel Herd*: se instala, se configura una vez, y desd
 | **Alertas** | Notificaciones de macOS al terminar con errores, con advertencias o si se pierde la supervisión. |
 | **Credenciales** | Asistente de primera instalación y pantalla de revalidación. Las claves viven en el Llavero, nunca en un JSON. |
 | **Claves del robot** | Clave del portal y de anti-captcha guardadas en el Llavero y enviadas en el evento (modo `tail`), sin reconfigurar la función. |
+| **Descargar TXT y JSON** | Localiza en S3 los archivos de cada ejecución y los guarda con el panel de macOS. |
 | **Todo dentro de la app** | Preferencias, historial, logs y caché en el contenedor de la app. Botones para abrir la carpeta y para restablecerla. |
 
 ## Requisitos
@@ -37,7 +38,9 @@ Parecida en espíritu a *Laravel Herd*: se instala, se configura una vez, y desd
         "lambda:GetFunctionConfiguration",
         "lambda:InvokeFunction",
         "logs:FilterLogEvents",
-        "logs:StartLiveTail"
+        "logs:StartLiveTail",
+        "s3:ListBucket",
+        "s3:GetObject"
       ],
       "Resource": "*"
     }
@@ -45,7 +48,7 @@ Parecida en espíritu a *Laravel Herd*: se instala, se configura una vez, y desd
 }
 ```
 
-`logs:StartLiveTail` es opcional: sin ese permiso la app funciona con sondeo y lo indica en pantalla.
+`logs:StartLiveTail` es opcional: sin ese permiso la app funciona con sondeo y lo indica en pantalla. Los permisos de S3 solo hacen falta para descargar el TXT y el JSON de una ejecución.
 
 ## Instalación
 
@@ -63,7 +66,7 @@ cd sri-robot-monitor
 open SriRobotMonitor.xcodeproj
 ```
 
-Compila con `⌘R`. Para pruebas y convenciones, consulta [docs/PRUEBAS.md](docs/PRUEBAS.md).
+Compila con `⌘R`. Para pruebas y convenciones, consulta [docs/TESTING.md](docs/TESTING.md).
 
 ## Primer uso
 
@@ -74,6 +77,23 @@ Compila con `⌘R`. Para pruebas y convenciones, consulta [docs/PRUEBAS.md](docs
 5. Pulsa **Empezar a supervisar**.
 
 Desde **Ajustes → Claves del robot** puedes guardar la clave del portal y la de anti-captcha. Se envían en el evento cuando relanzas con **Esperar el resultado** activado.
+
+## Descargar el TXT y el JSON
+
+En **Ejecuciones**, abre una ejecución con el LED verde o naranja: al final del detalle aparece *Archivos de la ejecución*. La app busca en el bucket configurado el TXT que el robot descargó del portal y el JSON con las claves, y los guarda donde elijas.
+
+Las rutas que inspecciona son las del robot:
+
+```
+facturas-recibidas/{ambiente}/{año}/{mes}/raw/       → TXT del portal
+facturas-recibidas/{ambiente}/{año}/{mes}/manifest/  → JSON de claves
+```
+
+Necesita `s3:ListBucket` y `s3:GetObject`, el bucket indicado en **Ajustes → Conexión** y el nombre de ambiente (`produccion`, `pruebas`, …) que usa el robot.
+
+## Por qué el LED está naranja o rojo
+
+El detalle de la ejecución lista el texto de cada advertencia y de cada error, con el `RequestId`. El botón *Ver esos WARNING en los registros* abre los logs filtrados por esa ejecución.
 
 ## Cómo leer el LED
 
@@ -108,14 +128,14 @@ Resumen rápido:
 - `SriRobotMonitor/Services/` — `MonitorEngine` (estado observable), análisis de ejecuciones a partir de los logs y persistencia.
 - `SriRobotMonitor/Views/` — interfaz SwiftUI en cristal líquido.
 
-Detalle en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
+Detalle en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Documentación
 
 - [CHANGELOG.md](CHANGELOG.md) — histórico de versiones.
-- [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) — capas, flujos y decisiones.
-- [docs/PRUEBAS.md](docs/PRUEBAS.md) — cómo probar sin credenciales reales.
-- [docs/USO_IA.md](docs/USO_IA.md) — cómo se ha usado IA en este proyecto.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — capas, flujos y decisiones.
+- [docs/TESTING.md](docs/TESTING.md) — cómo probar sin credenciales reales.
+- [docs/AI_USAGE.md](docs/AI_USAGE.md) — cómo se ha usado IA en este proyecto.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — convenciones, ramas y PR.
 - [SECURITY.md](SECURITY.md) — reporte de vulnerabilidades.
 

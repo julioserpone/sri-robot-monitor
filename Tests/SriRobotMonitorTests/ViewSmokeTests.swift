@@ -66,3 +66,22 @@ final class ViewSmokeTests: XCTestCase {
         return renderer.nsImage
     }
 }
+
+/// El LED de la barra de menús no se veía porque `MenuBarExtra` trata sus
+/// imágenes como plantilla y descarta el color.
+@MainActor
+final class MenuBarIconTests: XCTestCase {
+    func testIconIsNotATemplate() throws {
+        for status in RobotStatus.allCases {
+            let icon = try XCTUnwrap(MenuBarIcon.make(for: status), "Sin icono para \(status)")
+            XCTAssertFalse(icon.isTemplate, "El LED de \(status) se dibujaría sin color")
+            XCTAssertEqual(icon.size.width, 18, accuracy: 0.5)
+        }
+    }
+
+    func testStatusColorsAreDistinct() {
+        let colors = RobotStatus.allCases.map(\.color)
+        let described = colors.map { String(describing: $0) }
+        XCTAssertEqual(Set(described).count, colors.count, "Dos estados comparten color")
+    }
+}

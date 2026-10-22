@@ -17,6 +17,11 @@ struct LogsView: View {
             result = result.filter { $0.timestamp >= start && $0.timestamp <= end }
         }
 
+        // Llega desde el detalle de una ejecución con advertencias o errores.
+        if let requestID = engine.pendingLogHighlight {
+            result = result.filter { $0.requestID == requestID }
+        }
+
         result = result.filter { levels.contains($0.level) }
 
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -37,6 +42,14 @@ struct LogsView: View {
             content
         }
         .background(.clear)
+        .onChange(of: engine.pendingLogHighlight) { _, requestID in
+            guard let requestID else { return }
+            query = requestID
+            onlyLatestRun = false
+            levels = Set(LogLevel.allCases)
+            autoScroll = false
+            engine.pendingLogHighlight = nil
+        }
     }
 
     private var toolbar: some View {

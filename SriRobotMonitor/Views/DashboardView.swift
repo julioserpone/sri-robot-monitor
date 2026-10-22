@@ -202,6 +202,38 @@ struct DashboardView: View {
                         .background(Palette.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
 
+                    // Antes solo se decía "advertencia" sin explicar cuál era.
+                    if !run.warningMessages.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(run.warningMessages.prefix(3), id: \.self) { message in
+                                HStack(alignment: .top, spacing: 7) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.system(size: 9))
+                                        .foregroundStyle(Palette.amber)
+                                        .padding(.top, 2)
+                                    Text(message)
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(.white.opacity(0.72))
+                                        .lineLimit(2)
+                                        .textSelection(.enabled)
+                                }
+                            }
+                            if run.warningMessages.count < run.warningCount {
+                                Text("y \(run.warningCount - run.warningMessages.count) advertencia(s) más")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(Palette.textSecondary)
+                            }
+                            Button("Ver todas en el detalle") {
+                                engine.selectedSection = .runs
+                            }
+                            .buttonStyle(.link)
+                            .font(.system(size: 9))
+                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Palette.amber.opacity(0.07), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+
                     if let lastRequest = engine.lastInvocationRequestID {
                         HStack(spacing: 8) {
                             Image(systemName: "paperplane.fill")

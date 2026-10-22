@@ -238,6 +238,52 @@ struct RunDetailView: View {
                         }
                     }
 
+                    // Las advertencias se cuentan desde siempre, pero nunca se
+                    // decía cuáles eran: esto es lo que explica el LED naranja.
+                    if run.warningCount > 0 {
+                        VStack(alignment: .leading, spacing: 8) {
+                            SectionTitle(
+                                title: "Advertencias",
+                                subtitle: run.warningMessages.count < run.warningCount
+                                    ? "Se muestran \(run.warningMessages.count) de \(run.warningCount)"
+                                    : "\(run.warningCount) en esta ejecución",
+                                symbol: "exclamationmark.triangle"
+                            )
+                            if run.warningMessages.isEmpty {
+                                Text("La ejecución quedó marcada con advertencias, pero los logs no traen su texto. Abre «Ver registros» y filtra por WARNING con este RequestId.")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(Palette.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            } else {
+                                ForEach(Array(run.warningMessages.enumerated()), id: \.offset) { _, message in
+                                    HStack(alignment: .top, spacing: 7) {
+                                        Text("•")
+                                            .foregroundStyle(Palette.amber)
+                                        Text(message)
+                                            .font(.system(size: 10, design: .monospaced))
+                                            .foregroundStyle(.white.opacity(0.82))
+                                            .textSelection(.enabled)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                    .padding(10)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Palette.amber.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                }
+                            }
+                            Button {
+                                engine.selectedSection = .logs
+                                engine.pendingLogHighlight = run.requestID
+                                dismiss()
+                            } label: {
+                                Label("Ver esos WARNING en los registros", systemImage: "text.alignleft")
+                                    .font(.system(size: 9.5, weight: .semibold))
+                            }
+                            .buttonStyle(.link)
+                        }
+                    }
+
+                    RunArtifactsView(run: run)
+
                     if run.status == .healthy {
                         HStack(spacing: 9) {
                             Image(systemName: "checkmark.seal.fill")

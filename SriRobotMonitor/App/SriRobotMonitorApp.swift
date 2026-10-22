@@ -47,11 +47,49 @@ struct SriRobotMonitorApp: App {
 
 struct MenuBarLabel: View {
     let status: RobotStatus
+    /// Se calcula una sola vez: dibujar el icono en cada tick del sondeo
+    /// bastaría para que macOS lo volviera a pedir constantemente.
+    @State private var icon: NSImage?
 
     var body: some View {
-        Image(systemName: "circle.fill")
-            .foregroundStyle(status.color)
-            .accessibilityLabel("SRI Robot: \(status.title)")
+        Group {
+            if let icon {
+                Image(nsImage: icon)
+                    .accessibilityLabel("SRI Robot: \(status.title)")
+            } else {
+                Image(systemName: "circle.fill")
+                    .accessibilityLabel("SRI Robot: \(status.title)")
+            }
+        }
+        .task(id: status) { icon = MenuBarIcon.make(for: status) }
+    }
+}
+
+/// Icono del LED para la barra de menús.
+///
+/// `MenuBarExtra` dibuja sus `Image` como plantilla: ignora el color y lo
+/// pinta con el del sistema, así que un LED de color no se veía. Lo que
+/// controla eso es `NSImage.isTemplate`, que no se puede tocar desde SwiftUI;
+/// por eso el LED se rasteriza y se entrega como imagen no plantilla.
+@MainActor
+enum MenuBarIcon {
+    static func make(for status: RobotStatus, size: CGFloat = 18) -> NSImage? {
+        let renderer = ImageRenderer(
+            content: ZStack {
+                Circle()
+                    .fill(status.color.opacity(0.28))
+                    .frame(width: size * 0.9, height: size * 0.9)
+                Circle()
+                    .fill(status.color)
+                    .frame(width: size * 0.52, height: size * 0.52)
+            }
+            .frame(width: size, height: size)
+        )
+        renderer.scale = 2
+        guard let image = renderer.nsImage else { return nil }
+        image.isTemplate = false
+        image.size = NSSize(width: size, height: size)
+        return image
     }
 }
 

@@ -18,7 +18,7 @@ que los cambios entren sin fricción.
 - Xcode 26 (Swift 6, *strict concurrency*).
 - Sin dependencias externas: el proyecto no usa paquetes Swift, ni siquiera el
   SDK de AWS. Mantenerlo así es parte del diseño (ver
-  [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)).
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
 
 ```bash
 git clone https://github.com/julioserpone/sri-robot-monitor.git
@@ -69,7 +69,7 @@ xcodebuild -project SriRobotMonitor.xcodeproj -scheme SriRobotMonitor \
 
 Toda funcionalidad nueva trae pruebas. Si tocas el análisis de logs, la firma
 SigV4 o el decodificador de streams, **añade un caso que falle sin tu cambio**.
-Detalle en [docs/PRUEBAS.md](docs/PRUEBAS.md).
+Detalle en [docs/TESTING.md](docs/TESTING.md).
 
 ## Pull requests
 
@@ -87,5 +87,5 @@ Detalle en [docs/PRUEBAS.md](docs/PRUEBAS.md).
 ## Uso de IA
 
 Se acepta y se anima a usar asistentes. La condición es que entiendas y puedas
-explicar cada línea que envías. Lee [docs/USO_IA.md](docs/USO_IA.md) y declara
+explicar cada línea que envías. Lee [docs/AI_USAGE.md](docs/AI_USAGE.md) y declara
 el uso en el PR.

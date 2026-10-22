@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import AppKit
 import Observation
 import UserNotifications
 
@@ -47,6 +48,9 @@ final class MonitorEngine {
     var credentials: AWSCredentials?
     /// Secretos del robot que viajan en el evento de invocación.
     var environment = RobotEnvironment()
+    /// Artefactos (TXT y JSON) encontrados en S3 para cada ejecución.
+    var artifacts: [String: [S3Object]] = [:]
+    var artifactErrors: [String: String] = [:]
     var callerIdentity: CallerIdentity?
     var functionInfo: LambdaFunctionInfo?
     var runs: [RobotRun] = []
@@ -76,6 +80,9 @@ final class MonitorEngine {
     var lastInvocationFinishedAt: Date?
     /// Variables de entorno que la función de Lambda tiene declaradas.
     var functionEnvironmentKeys: Set<String> = []
+    /// RequestId que la vista de registros debe resaltar al abrirse. Se limpia
+    /// en cuanto la vista lo consume.
+    var pendingLogHighlight: String?
 
     private let persistence: AppPersistence
     /// Sesión HTTP de los clientes de AWS. Inyectable para poder probar los
@@ -630,6 +637,8 @@ final class MonitorEngine {
         config.region = draft.configuration.region
         config.functionName = draft.configuration.functionName
         config.logGroupName = draft.configuration.logGroupName
+        config.bucketName = draft.bucketName
+        config.environmentName = draft.environmentName
         config.environment = draft.environment
         config = RobotConfiguration.normalized(config)
 
@@ -827,6 +836,73 @@ final class MonitorEngine {
             requestID: requestID == "—" ? nil : requestID
         )
         logs.append(entry)
+    }
+
+    // MARK: - Descarga de artefactos
+
+    /// Busca en S3 el TXT y el JSON que el robot generó para una ejecución.
+    ///
+    /// Se hace a petición (al abrir el detalle o pulsar Descargar) y no en
+    /// cada sondeo: listar S3 cuesta una llamada por carpeta y período, y no
+    /// hace falta hasta que alguien quiere el archivo.
+    func loadArtifacts(for run: RobotRun) async {
+        guard let credentials, credentials.isComplete else { return }
+        guard !run.periods.isEmpty else {
+            artifactErrors[run.id] = "La ejecución no registró períodos en los logs."
+            return
+        }
+        guard !configuration.bucketName.isEmpty else {
+            artifactErrors[run.id] = "Indica el bucket de S3 en Ajustes para descargar los archivos."
+            return
+        }
+        if artifacts[run.id] != nil { return }
+
+        artifactErrors[run.id] = nil
+        let client = S3Client(
+            credentials: credentials,
+            region: configuration.region,
+            session: session
+        )
+        do {
+            let found = try await client.findArtifacts(
+                bucket: configuration.bucketName,
+                environment: run.environment ?? configuration.environmentName,
+                periods: run.periods,
+                ruc: run.ruc
+            )
+            artifacts[run.id] = found
+            if found.isEmpty {
+                artifactErrors[run.id] = "No hay archivos de esa ejecución en s3://\(configuration.bucketName)."
+            }
+        } catch let error as AWSAPIError {
+            artifactErrors[run.id] = error.friendlyMessage
+        } catch {
+            artifactErrors[run.id] = error.localizedDescription
+        }
+    }
+
+    /// Descarga un objeto y lo escribe donde la persona elija.
+    ///
+    /// Devuelve `false` si se canceló el diálogo de guardar.
+    func download(_ object: S3Object) async throws -> Bool {
+        guard let credentials, credentials.isComplete else {
+            throw SetupError.missingCredentials
+        }
+        let client = S3Client(
+            credentials: credentials,
+            region: configuration.region,
+            session: session
+        )
+        let data = try await client.getObject(object)
+
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = object.fileName
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        panel.title = "Guardar \(object.kind.title)"
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
+        try data.write(to: url, options: .atomic)
+        return true
     }
 
     // MARK: - Datos locales

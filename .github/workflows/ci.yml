@@ -27,7 +27,7 @@ jobs:
           set -euo pipefail
           missing=0
           for file in README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md \
-                      LICENSE docs/ARQUITECTURA.md docs/PRUEBAS.md docs/USO_IA.md \
+                      LICENSE docs/ARCHITECTURE.md docs/TESTING.md docs/AI_USAGE.md \
                       .github/pull_request_template.md .github/dependabot.yml \
                       .github/workflows/ci.yml .github/rulesets/main.json; do
             if [ ! -f "$file" ]; then

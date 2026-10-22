@@ -13,9 +13,15 @@ struct RobotConfiguration: Codable, Sendable, Equatable {
     var historyDays: Int
     /// Variables con las que se invoca al robot (la imagen sale de fábrica).
     var environment = RobotEnvironment()
+    /// Bucket donde el robot deja los TXT y los JSON. Vacío = sin descargas.
+    var bucketName: String = ""
+    /// Nombre del ambiente que usa el robot en las rutas de S3
+    /// (`facturas-recibidas/{ambiente}/...`).
+    var environmentName: String = RobotConfiguration.defaultEnvironmentName
 
     static let defaultFunctionName = "sri-txt-robot"
     static let defaultRegion = "us-east-1"
+    static let defaultEnvironmentName = "produccion"
 
     static let `default` = RobotConfiguration(
         region: defaultRegion,
@@ -40,6 +46,11 @@ struct RobotConfiguration: Codable, Sendable, Equatable {
         if copy.logGroupName.isEmpty {
             copy.logGroupName = defaultLogGroup(for: copy.functionName)
         }
+        copy.bucketName = copy.bucketName.trimmingCharacters(in: .whitespacesAndNewlines)
+        copy.environmentName = copy.environmentName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if copy.environmentName.isEmpty {
+            copy.environmentName = defaultEnvironmentName
+        }
         copy.pollIntervalSeconds = min(max(copy.pollIntervalSeconds, 2), 60)
         copy.historyDays = min(max(copy.historyDays, 1), 365)
         copy.environment = RobotEnvironment.normalized(copy.environment)
@@ -59,6 +70,9 @@ struct RobotConfiguration: Codable, Sendable, Equatable {
         pollIntervalSeconds = try container.decodeIfPresent(Int.self, forKey: .pollIntervalSeconds) ?? 4
         historyDays = try container.decodeIfPresent(Int.self, forKey: .historyDays) ?? 45
         environment = try container.decodeIfPresent(RobotEnvironment.self, forKey: .environment) ?? RobotEnvironment()
+        bucketName = try container.decodeIfPresent(String.self, forKey: .bucketName) ?? ""
+        environmentName = try container.decodeIfPresent(String.self, forKey: .environmentName)
+            ?? RobotConfiguration.defaultEnvironmentName
     }
 
     init(
@@ -70,7 +84,9 @@ struct RobotConfiguration: Codable, Sendable, Equatable {
         notifyOnStart: Bool = false,
         pollIntervalSeconds: Int,
         historyDays: Int,
-        environment: RobotEnvironment = RobotEnvironment()
+        environment: RobotEnvironment = RobotEnvironment(),
+        bucketName: String = "",
+        environmentName: String = RobotConfiguration.defaultEnvironmentName
     ) {
         self.region = region
         self.functionName = functionName
@@ -81,10 +97,17 @@ struct RobotConfiguration: Codable, Sendable, Equatable {
         self.pollIntervalSeconds = pollIntervalSeconds
         self.historyDays = historyDays
         self.environment = environment
+        self.bucketName = bucketName
+        self.environmentName = environmentName
     }
 
     var isUsable: Bool {
         !region.isEmpty && !functionName.isEmpty && !logGroupName.isEmpty
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case region, functionName, logGroupName, notificationsEnabled, notifyWarnings
+        case notifyOnStart, pollIntervalSeconds, historyDays, environment, bucketName, environmentName
     }
 
     var consoleURL: URL? {
@@ -131,6 +154,8 @@ struct AWSSetupDraft: Sendable, Equatable, Codable {
     var secretAccessKey: String = ""
     var sessionToken: String = ""
     var environment = RobotEnvironment()
+    var bucketName: String = ""
+    var environmentName: String = RobotConfiguration.defaultEnvironmentName
 
     init() {}
 
@@ -141,7 +166,9 @@ struct AWSSetupDraft: Sendable, Equatable, Codable {
         accessKeyID: String = "",
         secretAccessKey: String = "",
         sessionToken: String = "",
-        environment: RobotEnvironment = RobotEnvironment()
+        environment: RobotEnvironment = RobotEnvironment(),
+        bucketName: String = "",
+        environmentName: String = RobotConfiguration.defaultEnvironmentName
     ) {
         self.region = region
         self.functionName = functionName
@@ -150,6 +177,8 @@ struct AWSSetupDraft: Sendable, Equatable, Codable {
         self.secretAccessKey = secretAccessKey
         self.sessionToken = sessionToken
         self.environment = environment
+        self.bucketName = bucketName
+        self.environmentName = environmentName
     }
 
     /// El borrador que se guarda en disco no tiene secretos; al leerlo, los
@@ -190,7 +219,9 @@ struct AWSSetupDraft: Sendable, Equatable, Codable {
                 notifyWarnings: true,
                 pollIntervalSeconds: RobotConfiguration.default.pollIntervalSeconds,
                 historyDays: RobotConfiguration.default.historyDays,
-                environment: environment
+                environment: environment,
+                bucketName: bucketName,
+                environmentName: environmentName
             )
         )
     }
@@ -203,7 +234,9 @@ struct AWSSetupDraft: Sendable, Equatable, Codable {
             accessKeyID: credentials?.accessKeyID ?? "",
             secretAccessKey: credentials?.secretAccessKey ?? "",
             sessionToken: credentials?.sessionToken ?? "",
-            environment: configuration.environment
+            environment: configuration.environment,
+            bucketName: configuration.bucketName,
+            environmentName: configuration.environmentName
         )
     }
 }

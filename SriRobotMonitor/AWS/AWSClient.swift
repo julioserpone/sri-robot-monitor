@@ -205,6 +205,10 @@ struct AWSClient: Sendable {
         components.scheme = "https"
         components.host = override ?? service.host(region: region)
         let normalizedPath = path.isEmpty ? "/" : (path.hasPrefix("/") ? path : "/\(path)")
+        // La ruta llega ya codificada (`encodePathSegment`). Asignarla a
+        // `percentEncodedPath` hace que URLComponents vuelva a codificar los `%`
+        // y la ruta firmada dejaría de coincidir con la enviada en cuanto un
+        // nombre tuviera espacios o tildes.
         components.percentEncodedPath = normalizedPath
         if !query.isEmpty {
             components.queryItems = query
@@ -251,12 +255,14 @@ enum AWSService: String, Sendable {
     case sts
     case lambda
     case logs
+    case s3
 
     var signingName: String {
         switch self {
         case .sts: "sts"
         case .lambda: "lambda"
         case .logs: "logs"
+        case .s3: "s3"
         }
     }
 
@@ -265,6 +271,7 @@ enum AWSService: String, Sendable {
         case .sts: "STS"
         case .lambda: "Lambda"
         case .logs: "CloudWatch Logs"
+        case .s3: "S3"
         }
     }
 
@@ -276,6 +283,10 @@ enum AWSService: String, Sendable {
             return "lambda.\(region).amazonaws.com"
         case .logs:
             return "logs.\(region).amazonaws.com"
+        case .s3:
+            // Bucket en la ruta (`/<bucket>/<key>`), no en el host: así la
+            // firma también vale para nombres de bucket con puntos.
+            return "s3.\(region).amazonaws.com"
         }
     }
 
